@@ -32,6 +32,20 @@ button, textarea { font: inherit; }
 .subtitle { color: #8d95a5; font-size: 12px; margin-top: 3px; }
 .status { color: #9ca6b8; font-size: 12px; display:flex; gap:8px; align-items:center; }
 .status span { width: 8px; height: 8px; border-radius:999px; background:#62e6a7; box-shadow:0 0 18px #62e6a7; }
+.auth-actions { display:flex; gap:10px; align-items:center; }
+.auth-user { color:#9ca6b8; font-size:12px; }
+.auth-btn {
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  background: rgba(255,255,255,.05);
+  color: #cfd6e4;
+  cursor: pointer;
+  text-decoration: none;
+}
+.auth-btn:hover { background: rgba(255,255,255,.10); }
 .chat { padding: 34px 0 150px; display:flex; flex-direction:column; gap:18px; }
 .message {
   width: fit-content;
