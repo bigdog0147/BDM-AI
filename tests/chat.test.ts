@@ -1,0 +1,283 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+
+// The provider layer defaults to local Ollama. These tests mock global fetch
+// so no real Ollama or OpenAI call is ever made.
+
+const ENV_KEYS = [
+  "AI_PROVIDER",
+  "OLLAMA_MODEL",
+  "OLLAMA_HOST",
+  "OPENAI_API_KEY",
+  "OPENAI_MODEL",
+  "BDM_WEB_SEARCH_ENABLED"
+] as const;
+
+const originalEnv: Record<string, string | undefined> = {};
+
+beforeEach(() => {
+  for (const key of ENV_KEYS) originalEnv[key] = process.env[key];
+
+  // Default local-first environment.
+  process.env.AI_PROVIDER = "ollama";
+  process.env.OLLAMA_MODEL = "qwen3.5:4b";
+  process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
+  // An OpenAI key present here must NEVER be used in ollama mode.
+  process.env.OPENAI_API_KEY = "sk-test-not-a-real-secret";
+  delete process.env.BDM_WEB_SEARCH_ENABLED;
+});
+
+afterEach(() => {
+  for (const key of ENV_KEYS) {
+    if (originalEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = originalEnv[key];
+  }
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  vi.resetModules();
+  // Never let a doMock("openai") leak into a later test.
+  vi.doUnmock("openai");
+});
+
+function mockOllama(
+  body: unknown,
+  init?: { ok?: boolean; status?: number }
+) {
+  const fn = vi.fn(
+    async (
+      _url: string | URL | Request,
+      _init?: RequestInit
+    ): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> => ({
+      ok: init?.ok ?? true,
+      status: init?.status ?? 200,
+      json: async () => body
+    })
+  );
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
+
+async function post(body: unknown, headers: Record<string, string> = {}) {
+  const { POST } = await import("../app/api/chat/route");
+  const request = new Request("http://localhost/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(body)
+  });
+  return POST(request);
+}
+
+const ollamaOk = (text = "Hello from BDM.") => ({
+  message: { role: "assistant", content: text },
+  done: true
+});
+
+describe("provider selection", () => {
+  it("defaults to ollama when AI_PROVIDER is unset", async () => {
+    delete process.env.AI_PROVIDER;
+    const fetchMock = mockOllama(ollamaOk());
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.provider).toBe("ollama");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("calls the local Ollama /api/chat endpoint with a messages payload", async () => {
+    const fetchMock = mockOllama(ollamaOk());
+    await post({ message: "hello" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("http://127.0.0.1:11434/api/chat");
+    const payload = JSON.parse((init as RequestInit).body as string);
+    expect(payload.model).toBe("qwen3.5:4b");
+    expect(payload.stream).toBe(false);
+    expect(payload.messages[0]).toMatchObject({ role: "system" });
+    expect(payload.messages[1]).toEqual({ role: "user", content: "hello" });
+  });
+
+  it("returns the real Ollama response text to the UI", async () => {
+    mockOllama(ollamaOk("The capital of France is Paris."));
+    const data = await (await post({ message: "capital of France?" })).json();
+    expect(data.text).toBe("The capital of France is Paris.");
+    expect(data.model).toBe("qwen3.5:4b");
+    expect(data.provider).toBe("ollama");
+  });
+
+  it("honours OLLAMA_HOST and OLLAMA_MODEL", async () => {
+    process.env.OLLAMA_HOST = "http://127.0.0.1:9999";
+    process.env.OLLAMA_MODEL = "ornith-1.5:9b";
+    const fetchMock = mockOllama(ollamaOk());
+    await post({ message: "hi" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("http://127.0.0.1:9999/api/chat");
+    expect(JSON.parse((init as RequestInit).body as string).model).toBe(
+      "ornith-1.5:9b"
+    );
+  });
+
+  it("selects openai only when explicitly configured", async () => {
+    process.env.AI_PROVIDER = "openai";
+    process.env.OPENAI_MODEL = "gpt-5.6-luna";
+    const create = vi.fn(async () => ({ id: "r1", output_text: "hi there" }));
+    vi.doMock("openai", () => ({
+      default: class {
+        responses = { create };
+      }
+    }));
+    const data = await (await post({ message: "hi" })).json();
+    expect(data.provider).toBe("openai");
+    expect(data.text).toBe("hi there");
+    expect(create).toHaveBeenCalledOnce();
+    vi.doUnmock("openai");
+  });
+
+  it("rejects an unknown AI_PROVIDER without falling back to a paid provider", async () => {
+    process.env.AI_PROVIDER = "some-paid-thing";
+    const fetchMock = mockOllama(ollamaOk());
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("AI provider is misconfigured");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("OpenAI is never used in ollama mode", () => {
+  it("does not import or call the OpenAI SDK even when a key exists", async () => {
+    // A key is present in the env (set in beforeEach). If the route imported
+    // the SDK or called it, this mock would record a call.
+    const create = vi.fn(async () => ({ output_text: "SHOULD NOT HAPPEN" }));
+    vi.doMock("openai", () => ({
+      default: class {
+        responses = { create };
+      }
+    }));
+
+    const fetchMock = mockOllama(ollamaOk("local answer"));
+    const data = await (await post({ message: "hi" })).json();
+
+    expect(data.text).toBe("local answer");
+    expect(create).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0][0])).toContain("11434");
+    vi.doUnmock("openai");
+  });
+});
+
+describe("Ollama failure handling", () => {
+  it("reports Ollama unreachable with a safe message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("connect ECONNREFUSED");
+      })
+    );
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toContain("Ollama) is not running");
+  });
+
+  it("reports a missing model (404) safely", async () => {
+    mockOllama({}, { ok: false, status: 404 });
+    expect((await (await post({ message: "hi" })).json()).error).toContain(
+      "not installed"
+    );
+  });
+
+  it("reports a timeout safely", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const err = new Error("aborted");
+        err.name = "AbortError";
+        throw err;
+      })
+    );
+    expect((await (await post({ message: "hi" })).json()).error).toContain(
+      "timed out"
+    );
+  });
+
+  it("reports a malformed Ollama response safely", async () => {
+    const fn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new Error("bad json");
+      }
+    }));
+    vi.stubGlobal("fetch", fn);
+    expect((await (await post({ message: "hi" })).json()).error).toContain(
+      "unexpected response"
+    );
+  });
+
+  it("reports an empty Ollama response safely", async () => {
+    mockOllama({ message: { role: "assistant", content: "   " } });
+    expect((await (await post({ message: "hi" })).json()).error).toContain(
+      "unexpected response"
+    );
+  });
+
+  it("reports a non-200 Ollama error safely", async () => {
+    mockOllama({}, { ok: false, status: 500 });
+    expect((await (await post({ message: "hi" })).json()).error).toContain(
+      "reported an error"
+    );
+  });
+
+  it("reports a missing OLLAMA_MODEL safely", async () => {
+    delete process.env.OLLAMA_MODEL;
+    mockOllama(ollamaOk());
+    expect((await (await post({ message: "hi" })).json()).error).toBe(
+      "Local model is not configured"
+    );
+  });
+});
+
+describe("validation (unchanged)", () => {
+  it("rejects a missing message", async () => {
+    mockOllama(ollamaOk());
+    expect((await post({})).status).toBe(400);
+  });
+
+  it("rejects an empty or whitespace message", async () => {
+    mockOllama(ollamaOk());
+    expect((await post({ message: "  " })).status).toBe(400);
+  });
+
+  it("rejects an oversized message", async () => {
+    mockOllama(ollamaOk());
+    expect((await post({ message: "x".repeat(20001) })).status).toBe(413);
+  });
+
+  it("rejects invalid JSON", async () => {
+    mockOllama(ollamaOk());
+    const { POST } = await import("../app/api/chat/route");
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{bad"
+    });
+    expect((await POST(request)).status).toBe(400);
+  });
+
+  it("trims whitespace before sending", async () => {
+    const fetchMock = mockOllama(ollamaOk());
+    await post({ message: "  hi  " });
+    const payload = JSON.parse(
+      (fetchMock.mock.calls[0][1] as RequestInit).body as string
+    );
+    expect(payload.messages[1].content).toBe("hi");
+  });
+});
+
+describe("rate limiting (unchanged)", () => {
+  it("returns 429 once the per-window limit is exceeded", async () => {
+    mockOllama(ollamaOk());
+    const statuses: number[] = [];
+    for (let i = 0; i < 22; i++) {
+      statuses.push((await post({ message: "hi" })).status);
+    }
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThan(0);
+    expect(statuses[0]).toBe(200);
+  });
+});
