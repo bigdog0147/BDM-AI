@@ -1,4 +1,5 @@
 import { SYSTEM_PROMPT } from "../../../lib/prompt";
+import { persistTurn } from "../../../lib/persist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -221,6 +222,15 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "message is too long" }, { status: 413 });
     }
 
+    // Optional conversation to continue. Ignored (never trusted for auth);
+    // RLS on the server decides whether the caller may write to it.
+    const rawConversationId = (body as { conversationId?: unknown } | null)
+      ?.conversationId;
+    const conversationId =
+      typeof rawConversationId === "string" && rawConversationId.trim()
+        ? rawConversationId.trim()
+        : null;
+
     // Resolve the provider BEFORE doing any work. In ollama mode the OpenAI
     // SDK is never imported and no paid call can occur.
     const provider = resolveProvider();
@@ -236,11 +246,22 @@ export async function POST(request: Request): Promise<Response> {
       text = await callOpenAI(message);
     }
 
+    // Persist the turn only after a successful generation. This is
+    // best-effort: it never throws into the response path, and anonymous or
+    // unconfigured use simply isn't saved.
+    const savedConversationId = await persistTurn({
+      userMessage: message,
+      assistantText: text,
+      model,
+      conversationId
+    });
+
     return Response.json({
       id: `${provider}-${Date.now()}`,
       provider,
       model,
-      text
+      text,
+      conversationId: savedConversationId
     });
   } catch (error) {
     // Log detail server-side only; never return it to the browser.

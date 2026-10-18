@@ -71,6 +71,9 @@ const ollamaOk = (text = "Hello from BDM.") => ({
   done: true
 });
 
+// Hoisted mock for the persistence-wiring tests below (must be top-level).
+const persistMock = vi.hoisted(() => vi.fn());
+
 describe("provider selection", () => {
   it("defaults to ollama when AI_PROVIDER is unset", async () => {
     delete process.env.AI_PROVIDER;
@@ -279,5 +282,67 @@ describe("rate limiting (unchanged)", () => {
     }
     expect(statuses.filter((s) => s === 429).length).toBeGreaterThan(0);
     expect(statuses[0]).toBe(200);
+  });
+});
+
+describe("conversation persistence wiring", () => {
+  // persistTurn is mocked so these tests prove the ROUTE calls it with the
+  // right arguments and surfaces the returned conversationId - independent
+  // of whether a Supabase session exists.
+  beforeEach(() => {
+    persistMock.mockReset();
+    // Default: signed-in path saves and returns a conversation id.
+    persistMock.mockResolvedValue("convo-123");
+    vi.doMock("../lib/persist", () => ({ persistTurn: persistMock }));
+  });
+
+  afterEach(() => {
+    vi.doUnmock("../lib/persist");
+  });
+
+  it("calls persistTurn with the user message, reply, and model", async () => {
+    mockOllama(ollamaOk("saved reply"));
+    const res = await post({ message: "remember this" });
+    expect(res.status).toBe(200);
+    expect(persistMock).toHaveBeenCalledOnce();
+    expect(persistMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userMessage: "remember this",
+        assistantText: "saved reply",
+        model: "qwen3.5:4b"
+      })
+    );
+  });
+
+  it("returns the conversationId from persistTurn to the client", async () => {
+    mockOllama(ollamaOk());
+    const data = await (await post({ message: "hi" })).json();
+    expect(data.conversationId).toBe("convo-123");
+  });
+
+  it("forwards a client-supplied conversationId to persistTurn", async () => {
+    mockOllama(ollamaOk());
+    await post({ message: "continue", conversationId: "convo-abc" });
+    expect(persistMock).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "convo-abc" })
+    );
+  });
+
+  it("still returns the reply when persistence is unavailable (null)", async () => {
+    // Anonymous / unconfigured: persistTurn returns null, chat must not fail.
+    persistMock.mockResolvedValue(null);
+    mockOllama(ollamaOk("reply without saving"));
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.text).toBe("reply without saving");
+    expect(data.conversationId).toBeNull();
+  });
+
+  it("does not persist when the provider call fails", async () => {
+    mockOllama(ollamaOk(), { ok: false, status: 500 });
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(500);
+    expect(persistMock).not.toHaveBeenCalled();
   });
 });
