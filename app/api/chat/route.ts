@@ -46,10 +46,65 @@ function resolveOllamaFallbackModel(): string | null {
   return model ? model : null;
 }
 
+/**
+ * Where the fallback model lives.
+ *
+ * The fallback is a local model, so it goes to the local server even when
+ * the primary model is hosted.
+ */
+function resolveOllamaFallbackHost(): string {
+  return (
+    process.env.OLLAMA_FALLBACK_HOST?.trim() || resolveOllamaHost()
+  );
+}
+
 function resolveOllamaHost(): string {
   return (
     process.env.OLLAMA_HOST?.trim() || "http://127.0.0.1:11434"
   );
+}
+
+/**
+ * The hosted API, used when an API key is available.
+ *
+ * "https://ollama.com" serves cloud models without any local install. The
+ * key is optional here: without one the app stays on the local server.
+ */
+function resolveOllamaApiHost(): string | null {
+  const host = process.env.OLLAMA_API_HOST?.trim();
+  if (host) return host;
+  return resolveOllamaApiKey() ? "https://ollama.com" : null;
+}
+
+function resolveOllamaApiKey(): string | null {
+  const key = process.env.OLLAMA_API_KEY?.trim();
+  return key ? key : null;
+}
+
+/** Never send the key to a local server: it only ever goes to Ollama. */
+function isLocalHost(host: string): boolean {
+  try {
+    const hostname = new URL(host).hostname;
+    return (
+      hostname === "127.0.0.1" ||
+      hostname === "localhost" ||
+      hostname === "::1" ||
+      hostname === "0.0.0.0"
+    );
+  } catch {
+    return true;
+  }
+}
+
+function ollamaHeaders(host: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json"
+  };
+  const key = resolveOllamaApiKey();
+  if (key && !isLocalHost(host)) {
+    headers.authorization = `Bearer ${key}`;
+  }
+  return headers;
 }
 
 function resolveOpenAIModel(): string {
@@ -70,10 +125,9 @@ function resolveOpenAIModel(): string {
  */
 async function callOllamaModel(
   message: string,
-  model: string
+  model: string,
+  host: string
 ): Promise<string> {
-  const host = resolveOllamaHost();
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
 
@@ -81,7 +135,7 @@ async function callOllamaModel(
   try {
     response = await fetch(`${host}/api/chat`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: ollamaHeaders(host),
       body: JSON.stringify({
         model,
         stream: false,
@@ -109,7 +163,7 @@ async function callOllamaModel(
     if (response.status === 404) {
       throw new Error("ollama model not found");
     }
-    // 401/403 come from a hosted model that has no valid session.
+    // 401/403 come from a hosted model that has no valid key or session.
     if (response.status === 401 || response.status === 403) {
       throw new Error("ollama cloud unavailable");
     }
@@ -142,23 +196,35 @@ async function callOllamaModel(
 async function callOllama(
   message: string
 ): Promise<{ text: string; model: string }> {
-  const primary = resolveOllamaModel();
+  const apiHost = resolveOllamaApiHost();
   const fallback = resolveOllamaFallbackModel();
 
+  // With a key the primary call goes to the hosted API, using the hosted
+  // model name when one is given. Without a key it stays on the local
+  // server, which needs no credentials at all.
+  const primaryHost = apiHost || resolveOllamaHost();
+  const primaryModel = apiHost
+    ? process.env.OLLAMA_API_MODEL?.trim() || resolveOllamaModel()
+    : resolveOllamaModel();
+
   try {
-    const text = await callOllamaModel(message, primary);
-    return { text, model: primary };
+    const text = await callOllamaModel(message, primaryModel, primaryHost);
+    return { text, model: primaryModel };
   } catch (primaryError) {
-    if (!fallback || fallback === primary) {
+    if (!fallback) {
       throw primaryError;
     }
 
     try {
-      const text = await callOllamaModel(message, fallback);
+      const text = await callOllamaModel(
+        message,
+        fallback,
+        resolveOllamaFallbackHost()
+      );
       return { text, model: fallback };
     } catch (fallbackError) {
       // The primary failure is the more useful one to report: it names the
-      // real reason (no sign-in, plan limit, unknown model).
+      // real reason (no key, plan limit, unknown model).
       console.error("BDM ollama fallback failed", fallbackError);
       throw primaryError;
     }
@@ -228,7 +294,7 @@ function safeError(message: string): string {
     return "The configured local model is not installed. Pull it in Ollama and try again.";
   }
   if (message.includes("ollama cloud unavailable")) {
-    return "The hosted model is unavailable. Sign in with 'ollama signin' and try again.";
+    return "The hosted model is unavailable. Check the Ollama API key, or sign in with 'ollama signin', and try again.";
   }
   if (message.includes("ollama timeout")) {
     return "The local assistant timed out. Please try again.";

@@ -7,7 +7,11 @@ const ENV_KEYS = [
   "AI_PROVIDER",
   "OLLAMA_MODEL",
   "OLLAMA_FALLBACK_MODEL",
+  "OLLAMA_FALLBACK_HOST",
   "OLLAMA_HOST",
+  "OLLAMA_API_KEY",
+  "OLLAMA_API_HOST",
+  "OLLAMA_API_MODEL",
   "OPENAI_API_KEY",
   "OPENAI_MODEL",
   "BDM_WEB_SEARCH_ENABLED"
@@ -24,6 +28,11 @@ beforeEach(() => {
   process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
   // No fallback by default: the fallback is opt-in via OLLAMA_FALLBACK_MODEL.
   delete process.env.OLLAMA_FALLBACK_MODEL;
+  delete process.env.OLLAMA_FALLBACK_HOST;
+  // A real key in the environment must never change what the tests call.
+  delete process.env.OLLAMA_API_KEY;
+  delete process.env.OLLAMA_API_HOST;
+  delete process.env.OLLAMA_API_MODEL;
   // An OpenAI key present here must NEVER be used in ollama mode.
   process.env.OPENAI_API_KEY = "sk-test-not-a-real-secret";
   delete process.env.BDM_WEB_SEARCH_ENABLED;
@@ -432,5 +441,54 @@ describe("hosted model with a local fallback", () => {
     const res = await post({ message: "hi" });
     expect(res.status).toBe(500);
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("calls the hosted API with a bearer token when a key is configured", async () => {
+    process.env.OLLAMA_API_HOST = "https://ollama.com";
+    process.env.OLLAMA_API_MODEL = "gemma4:31b";
+    process.env.OLLAMA_API_KEY = "test-key";
+    const { seen } = mockOllamaSequence([{ body: ollamaOk("hosted answer") }]);
+
+    const data = await (await post({ message: "hi" })).json();
+    expect(data.text).toBe("hosted answer");
+    expect(data.model).toBe("gemma4:31b");
+    expect(seen[0].url).toBe("https://ollama.com/api/chat");
+    const headers = seen[0].init?.headers as Record<string, string>;
+    expect(headers.authorization).toBe("Bearer test-key");
+  });
+
+  it("falls back to the local server and never sends the key to it", async () => {
+    process.env.OLLAMA_API_HOST = "https://ollama.com";
+    process.env.OLLAMA_API_MODEL = "gemma4:31b";
+    process.env.OLLAMA_API_KEY = "test-key";
+    process.env.OLLAMA_FALLBACK_MODEL = "qwen2.5:0.5b";
+    process.env.OLLAMA_FALLBACK_HOST = "http://127.0.0.1:11434";
+
+    const { seen } = mockOllamaSequence([
+      { body: {}, ok: false, status: 403 },
+      { body: ollamaOk("local answer") }
+    ]);
+
+    const data = await (await post({ message: "hi" })).json();
+    expect(data.text).toBe("local answer");
+    expect(data.model).toBe("qwen2.5:0.5b");
+
+    // The hosted call carries the key...
+    const hostedHeaders = seen[0].init?.headers as Record<string, string>;
+    expect(hostedHeaders.authorization).toBe("Bearer test-key");
+    // ...and the local fallback must never receive it.
+    expect(seen[1].url).toBe("http://127.0.0.1:11434/api/chat");
+    const localHeaders = seen[1].init?.headers as Record<string, string>;
+    expect(localHeaders.authorization).toBeUndefined();
+  });
+
+  it("keeps the local server as the primary when there is no key", async () => {
+    const { seen } = mockOllamaSequence([{ body: ollamaOk("local answer") }]);
+
+    const data = await (await post({ message: "hi" })).json();
+    expect(data.text).toBe("local answer");
+    expect(seen[0].url).toBe("http://127.0.0.1:11434/api/chat");
+    const headers = seen[0].init?.headers as Record<string, string>;
+    expect(headers.authorization).toBeUndefined();
   });
 });
