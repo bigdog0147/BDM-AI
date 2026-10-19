@@ -6,3 +6,7 @@ node_modules
 coverage
 .DS_Store
 npm-debug.log*
+
+# TypeScript build artifacts
+*.tsbuildinfo
+next-env.d.ts
