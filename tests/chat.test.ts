@@ -6,6 +6,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 const ENV_KEYS = [
   "AI_PROVIDER",
   "OLLAMA_MODEL",
+  "OLLAMA_FALLBACK_MODEL",
   "OLLAMA_HOST",
   "OPENAI_API_KEY",
   "OPENAI_MODEL",
@@ -21,6 +22,8 @@ beforeEach(() => {
   process.env.AI_PROVIDER = "ollama";
   process.env.OLLAMA_MODEL = "qwen3.5:4b";
   process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
+  // No fallback by default: the fallback is opt-in via OLLAMA_FALLBACK_MODEL.
+  delete process.env.OLLAMA_FALLBACK_MODEL;
   // An OpenAI key present here must NEVER be used in ollama mode.
   process.env.OPENAI_API_KEY = "sk-test-not-a-real-secret";
   delete process.env.BDM_WEB_SEARCH_ENABLED;
@@ -70,6 +73,32 @@ const ollamaOk = (text = "Hello from BDM.") => ({
   message: { role: "assistant", content: text },
   done: true
 });
+
+/** Mock that answers with a different result on each call. */
+function mockOllamaSequence(
+  steps: { body: unknown; ok?: boolean; status?: number }[]
+) {
+  let index = 0;
+  const seen: { url: string; init?: RequestInit }[] = [];
+
+  const fn = vi.fn(
+    async (
+      url: string | URL | Request,
+      init?: RequestInit
+    ): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> => {
+      seen.push({ url: String(url), init });
+      const step = steps[Math.min(index, steps.length - 1)];
+      index += 1;
+      return {
+        ok: step.ok ?? true,
+        status: step.status ?? 200,
+        json: async () => step.body
+      };
+    }
+  );
+  vi.stubGlobal("fetch", fn);
+  return { fn, seen };
+}
 
 // Hoisted mock for the persistence-wiring tests below (must be top-level).
 const persistMock = vi.hoisted(() => vi.fn());
@@ -344,5 +373,64 @@ describe("conversation persistence wiring", () => {
     const res = await post({ message: "hi" });
     expect(res.status).toBe(500);
     expect(persistMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("hosted model with a local fallback", () => {
+  it("falls back to the secondary model when the hosted model is unavailable", async () => {
+    process.env.OLLAMA_MODEL = "gemma4:cloud";
+    process.env.OLLAMA_FALLBACK_MODEL = "qwen2.5:0.5b";
+    const { fn: fetchMock, seen } = mockOllamaSequence([
+      { body: {}, ok: false, status: 403 },
+      { body: ollamaOk("local answer") }
+    ]);
+
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.text).toBe("local answer");
+    // The response must name the model that actually answered.
+    expect(data.model).toBe("qwen2.5:0.5b");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const first = JSON.parse(seen[0].init?.body as string);
+    const second = JSON.parse(seen[1].init?.body as string);
+    expect(first.model).toBe("gemma4:cloud");
+    expect(second.model).toBe("qwen2.5:0.5b");
+  });
+
+  it("does not call the fallback when the primary model answers", async () => {
+    process.env.OLLAMA_MODEL = "gemma4:cloud";
+    process.env.OLLAMA_FALLBACK_MODEL = "qwen2.5:0.5b";
+    const fetchMock = mockOllama(ollamaOk("cloud answer"));
+
+    const data = await (await post({ message: "hi" })).json();
+    expect(data.text).toBe("cloud answer");
+    expect(data.model).toBe("gemma4:cloud");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("reports the primary failure when both models fail", async () => {
+    process.env.OLLAMA_MODEL = "gemma4:cloud";
+    process.env.OLLAMA_FALLBACK_MODEL = "qwen2.5:0.5b";
+    mockOllamaSequence([
+      { body: {}, ok: false, status: 403 },
+      { body: {}, ok: false, status: 404 }
+    ]);
+
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.error).toContain("hosted model is unavailable");
+  });
+
+  it("keeps the previous behaviour when no fallback is configured", async () => {
+    delete process.env.OLLAMA_FALLBACK_MODEL;
+    process.env.OLLAMA_MODEL = "gemma4:cloud";
+    const fetchMock = mockOllama({ body: {}, ok: false, status: 403 });
+
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(500);
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

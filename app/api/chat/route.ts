@@ -32,6 +32,20 @@ function resolveOllamaModel(): string {
   return model;
 }
 
+/**
+ * Optional second model, used only when the primary one fails.
+ *
+ * A hosted model (a name ending in ":cloud") needs a signed-in Ollama
+ * account and a network round trip, so it can be unavailable for reasons a
+ * local model is not. The fallback keeps the app answering instead of
+ * erroring out. It is optional: without it the primary failure surfaces
+ * as before.
+ */
+function resolveOllamaFallbackModel(): string | null {
+  const model = process.env.OLLAMA_FALLBACK_MODEL?.trim();
+  return model ? model : null;
+}
+
 function resolveOllamaHost(): string {
   return (
     process.env.OLLAMA_HOST?.trim() || "http://127.0.0.1:11434"
@@ -50,10 +64,15 @@ function resolveOpenAIModel(): string {
  * Local Ollama chat via the documented /api/chat endpoint. Called from the
  * server route only - never from browser JavaScript. Uses fetch with an
  * AbortController so timeouts are enforced. Returns the assistant text.
+ *
+ * `model` is passed in so the same call can serve the primary model and the
+ * fallback model.
  */
-async function callOllama(message: string): Promise<string> {
+async function callOllamaModel(
+  message: string,
+  model: string
+): Promise<string> {
   const host = resolveOllamaHost();
-  const model = resolveOllamaModel();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
@@ -90,6 +109,10 @@ async function callOllama(message: string): Promise<string> {
     if (response.status === 404) {
       throw new Error("ollama model not found");
     }
+    // 401/403 come from a hosted model that has no valid session.
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("ollama cloud unavailable");
+    }
     throw new Error(`ollama error ${response.status}`);
   }
 
@@ -108,6 +131,38 @@ async function callOllama(message: string): Promise<string> {
   }
 
   return text.trim();
+}
+
+/**
+ * Call Ollama with the primary model and fall back to the secondary one.
+ *
+ * The model that actually answered is returned, so the response and the
+ * persisted turn record the truth rather than the intention.
+ */
+async function callOllama(
+  message: string
+): Promise<{ text: string; model: string }> {
+  const primary = resolveOllamaModel();
+  const fallback = resolveOllamaFallbackModel();
+
+  try {
+    const text = await callOllamaModel(message, primary);
+    return { text, model: primary };
+  } catch (primaryError) {
+    if (!fallback || fallback === primary) {
+      throw primaryError;
+    }
+
+    try {
+      const text = await callOllamaModel(message, fallback);
+      return { text, model: fallback };
+    } catch (fallbackError) {
+      // The primary failure is the more useful one to report: it names the
+      // real reason (no sign-in, plan limit, unknown model).
+      console.error("BDM ollama fallback failed", fallbackError);
+      throw primaryError;
+    }
+  }
 }
 
 /**
@@ -171,6 +226,9 @@ function safeError(message: string): string {
   }
   if (message.includes("ollama model not found")) {
     return "The configured local model is not installed. Pull it in Ollama and try again.";
+  }
+  if (message.includes("ollama cloud unavailable")) {
+    return "The hosted model is unavailable. Sign in with 'ollama signin' and try again.";
   }
   if (message.includes("ollama timeout")) {
     return "The local assistant timed out. Please try again.";
@@ -239,8 +297,9 @@ export async function POST(request: Request): Promise<Response> {
     let model: string;
 
     if (provider === "ollama") {
-      model = resolveOllamaModel();
-      text = await callOllama(message);
+      const result = await callOllama(message);
+      model = result.model;
+      text = result.text;
     } else {
       model = resolveOpenAIModel();
       text = await callOpenAI(message);
