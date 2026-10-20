@@ -39,7 +39,12 @@ type ChatMessage = {
 type Status = {
   signedIn: boolean;
   memory: { available: boolean };
-  ai: { provider: string; model: string | null; configured: boolean };
+  ai: {
+    provider: string;
+    model: string | null;
+    configured: boolean;
+    fallback?: { provider: string | null; configured: boolean };
+  };
   search: { provider: string | null; configured: boolean };
   images: { provider: string | null; model: string | null; configured: boolean };
   voice: {
@@ -362,8 +367,10 @@ export default function Home() {
       {status && (
         <div className="capabilities" aria-label="Provider status">
           <span className={`chip ${status.ai.configured ? "ok" : "warn"}`}>
-            AI: {status.ai.provider}
-            {status.ai.model ? ` · ${status.ai.model}` : ""}
+            AI: {status.ai.configured ? status.ai.provider : "not configured"}
+            {status.ai.configured && status.ai.model
+              ? ` · ${status.ai.model}`
+              : ""}
           </span>
           <span className={`chip ${status.search.configured ? "ok" : "muted"}`}>
             Research: {status.search.configured ? status.search.provider : "not configured"}

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { aiStatus, generateReply } from "../../../../lib/ai";
 import { currentUser } from "../../../../lib/auth";
 import { parseEmailDraft } from "../../../../lib/email";
-import { safeError, safeErrorStatus } from "../../../../lib/errors";
+import { safeError, safeErrorStatus, safeLogDetail } from "../../../../lib/errors";
 import { consumeUserQuota, quotaLimits, retryAfterSeconds } from "../../../../lib/quota";
 
 export const runtime = "nodejs";
@@ -105,7 +105,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("BDM email draft error", message);
+    console.error("BDM email draft error", safeLogDetail(error));
     return NextResponse.json(
       { error: safeError(message), sent: false },
       { status: safeErrorStatus(message) }

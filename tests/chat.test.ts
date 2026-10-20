@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const ENV_KEYS = [
   "AI_PROVIDER",
+  "AI_FALLBACK_PROVIDER",
   "OLLAMA_MODEL",
   "OLLAMA_FALLBACK_MODEL",
   "OLLAMA_FALLBACK_HOST",
@@ -14,7 +15,9 @@ const ENV_KEYS = [
   "OLLAMA_API_MODEL",
   "OPENAI_API_KEY",
   "OPENAI_MODEL",
-  "BDM_WEB_SEARCH_ENABLED"
+  "BDM_WEB_SEARCH_ENABLED",
+  "RENDER",
+  "RENDER_SERVICE_ID"
 ] as const;
 
 const originalEnv: Record<string, string | undefined> = {};
@@ -29,6 +32,11 @@ beforeEach(() => {
   // No fallback by default: the fallback is opt-in via OLLAMA_FALLBACK_MODEL.
   delete process.env.OLLAMA_FALLBACK_MODEL;
   delete process.env.OLLAMA_FALLBACK_HOST;
+  // Cross-provider fallback is opt-in and must not leak in from the machine.
+  delete process.env.AI_FALLBACK_PROVIDER;
+  // Tests simulate a non-Render host unless a test opts in.
+  delete process.env.RENDER;
+  delete process.env.RENDER_SERVICE_ID;
   // A real key in the environment must never change what the tests call.
   delete process.env.OLLAMA_API_KEY;
   delete process.env.OLLAMA_API_HOST;
@@ -386,11 +394,11 @@ describe("conversation persistence wiring", () => {
 });
 
 describe("hosted model with a local fallback", () => {
-  it("falls back to the secondary model when the hosted model is unavailable", async () => {
+  it("falls back to the secondary model after a transient primary failure", async () => {
     process.env.OLLAMA_MODEL = "gemma4:cloud";
     process.env.OLLAMA_FALLBACK_MODEL = "qwen2.5:0.5b";
     const { fn: fetchMock, seen } = mockOllamaSequence([
-      { body: {}, ok: false, status: 403 },
+      { body: {}, ok: false, status: 500 },
       { body: ollamaOk("local answer") }
     ]);
 
@@ -423,20 +431,32 @@ describe("hosted model with a local fallback", () => {
     process.env.OLLAMA_MODEL = "gemma4:cloud";
     process.env.OLLAMA_FALLBACK_MODEL = "qwen2.5:0.5b";
     mockOllamaSequence([
-      { body: {}, ok: false, status: 403 },
+      { body: {}, ok: false, status: 500 },
       { body: {}, ok: false, status: 404 }
     ]);
 
     const res = await post({ message: "hi" });
     expect(res.status).toBe(500);
     const data = await res.json();
+    expect(data.error).toContain("reported an error");
+  });
+
+  it("never retries an authentication failure on the model fallback", async () => {
+    process.env.OLLAMA_MODEL = "gemma4:cloud";
+    process.env.OLLAMA_FALLBACK_MODEL = "qwen2.5:0.5b";
+    const fetchMock = mockOllama({}, { ok: false, status: 403 });
+
+    const res = await post({ message: "hi" });
+    expect(res.status).toBe(500);
+    const data = await res.json();
     expect(data.error).toContain("hosted model is unavailable");
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("keeps the previous behaviour when no fallback is configured", async () => {
     delete process.env.OLLAMA_FALLBACK_MODEL;
     process.env.OLLAMA_MODEL = "gemma4:cloud";
-    const fetchMock = mockOllama({ body: {}, ok: false, status: 403 });
+    const fetchMock = mockOllama({}, { ok: false, status: 403 });
 
     const res = await post({ message: "hi" });
     expect(res.status).toBe(500);
@@ -465,7 +485,7 @@ describe("hosted model with a local fallback", () => {
     process.env.OLLAMA_FALLBACK_HOST = "http://127.0.0.1:11434";
 
     const { seen } = mockOllamaSequence([
-      { body: {}, ok: false, status: 403 },
+      { body: {}, ok: false, status: 500 },
       { body: ollamaOk("local answer") }
     ]);
 

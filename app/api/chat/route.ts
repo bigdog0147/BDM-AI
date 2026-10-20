@@ -1,7 +1,7 @@
 import { SYSTEM_PROMPT } from "../../../lib/prompt";
 import { persistTurn } from "../../../lib/persist";
 import { generateReply } from "../../../lib/ai";
-import { safeError } from "../../../lib/errors";
+import { safeError, safeLogDetail } from "../../../lib/errors";
 import { currentUser } from "../../../lib/auth";
 import {
   buildMemoryContext,
@@ -241,7 +241,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     // Log detail server-side only; never return it to the browser.
-    console.error("BDM chat error", error);
+    console.error("BDM chat error", safeLogDetail(error));
     const message = error instanceof Error ? error.message : String(error);
     return Response.json({ error: safeError(message) }, { status: 500 });
   }

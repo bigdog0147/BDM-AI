@@ -3,6 +3,8 @@ node_modules
 .env
 .env.local
 .env.*.local
+.env.production
+.env.production.local
 coverage
 .DS_Store
 npm-debug.log*

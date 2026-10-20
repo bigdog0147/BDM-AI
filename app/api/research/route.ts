@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { generateReply } from "../../../lib/ai";
 import { currentUser } from "../../../lib/auth";
 import { hashSubject } from "../../../lib/auth-email";
-import { safeError, safeErrorStatus } from "../../../lib/errors";
+import { safeError, safeErrorStatus, safeLogDetail } from "../../../lib/errors";
 import { persistTurn } from "../../../lib/persist";
 import {
   consumeSharedQuota,
@@ -170,7 +170,7 @@ export async function POST(request: Request): Promise<Response> {
     model = generated.model;
     provider = generated.provider;
   } catch (error) {
-    console.error("BDM research synthesis error", error);
+    console.error("BDM research synthesis error", safeLogDetail(error));
     const message = error instanceof Error ? error.message : String(error);
     // Sources are still returned: the search itself succeeded, and hiding
     // them would make a partial failure look like no research happened.

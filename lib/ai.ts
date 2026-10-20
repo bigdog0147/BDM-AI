@@ -1,18 +1,31 @@
 /**
  * AI provider layer.
  *
- * Extracted verbatim from the chat route so research (and any future tool)
- * can reuse the exact same provider behaviour instead of growing a second
- * copy. Behaviour is intentionally unchanged:
+ * Two server-side providers, selected by AI_PROVIDER:
+ *   - openai: OPENAI_API_KEY + OPENAI_MODEL
+ *   - ollama: Ollama Cloud (OLLAMA_API_KEY + OLLAMA_API_MODEL, endpoint
+ *     https://ollama.com) or a local server (OLLAMA_MODEL + OLLAMA_HOST).
  *
- *  - Ollama is the default; the OpenAI SDK is only imported when the
- *    provider is explicitly "openai", so a paid call can never happen by
- *    accident in local mode.
- *  - A hosted Ollama model (":cloud") is only tried when a key exists.
- *  - OLLAMA_FALLBACK_MODEL is optional and only used after a primary failure.
+ * An optional, explicitly configured secondary provider
+ * (AI_FALLBACK_PROVIDER=none|openai|ollama) is tried once when the primary
+ * fails for a transient reason (timeout, network, 429, 5xx). Authentication,
+ * configuration, and malformed-response errors never trigger a fallback, so a
+ * bad key is reported instead of silently masked by another provider.
+ *
+ * The OpenAI SDK is imported lazily, so an Ollama deployment never loads it
+ * and cannot accidentally spend money.
  */
 
-export type Provider = "ollama" | "openai";
+export type Provider = "openai" | "ollama";
+
+export type FailureKind =
+  | "config"
+  | "auth"
+  | "rate_limit"
+  | "timeout"
+  | "unreachable"
+  | "server"
+  | "bad_response";
 
 export const OLLAMA_TIMEOUT_MS = 240_000;
 export const OPENAI_TIMEOUT_MS = 60_000;
@@ -29,68 +42,74 @@ export interface GenerateResult {
   text: string;
   model: string;
   provider: Provider;
+  /** Set only when the answering provider is the configured fallback. */
+  fallbackFrom?: Provider;
+}
+
+/** A configuration problem, safe to map directly to an actionable message. */
+export class ProviderConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderConfigError";
+  }
+}
+
+/** A classified provider failure. Messages never contain credentials. */
+export class ProviderError extends Error {
+  readonly provider: Provider;
+  readonly kind: FailureKind;
+
+  constructor(provider: Provider, kind: FailureKind, message: string) {
+    super(message);
+    this.name = "ProviderError";
+    this.provider = provider;
+    this.kind = kind;
+  }
+}
+
+/**
+ * Only a transient failure may be retried on the secondary provider.
+ * Auth/config errors must surface, and a malformed response must not be
+ * papered over by silently asking a different vendor.
+ */
+export function isFallbackEligible(error: unknown): boolean {
+  return (
+    error instanceof ProviderError &&
+    (error.kind === "timeout" ||
+      error.kind === "unreachable" ||
+      error.kind === "rate_limit" ||
+      error.kind === "server")
+  );
 }
 
 export function resolveProvider(): Provider {
   const value = process.env.AI_PROVIDER?.trim().toLowerCase();
-  // Default to local Ollama so the app never spends on OpenAI by accident.
+  // Default to Ollama so an unconfigured deployment never spends on OpenAI.
   if (!value || value === "ollama") return "ollama";
   if (value === "openai") return "openai";
-  // An unknown value must not silently fall back to a paid provider.
-  throw new Error(`Unknown AI_PROVIDER: ${value}`);
+  throw new ProviderConfigError(`Unknown AI_PROVIDER: ${value}`);
 }
 
-export function resolveOllamaModel(): string {
-  const model = process.env.OLLAMA_MODEL?.trim();
-  if (!model) {
-    throw new Error("OLLAMA_MODEL is not configured");
+/** Explicit secondary provider, or null. Never inferred. */
+export function resolveFallbackProvider(primary: Provider): Provider | null {
+  const raw = process.env.AI_FALLBACK_PROVIDER?.trim().toLowerCase();
+  if (!raw || raw === "none" || raw === "off") return null;
+  if (raw !== "openai" && raw !== "ollama") {
+    throw new ProviderConfigError(`Unknown AI_FALLBACK_PROVIDER: ${raw}`);
   }
-  return model;
+  if (raw === primary) {
+    throw new ProviderConfigError(
+      "AI_FALLBACK_PROVIDER must differ from AI_PROVIDER"
+    );
+  }
+  return raw;
 }
 
-/**
- * Optional second model, used only when the primary one fails.
- *
- * A hosted model (a name ending in ":cloud") needs a signed-in Ollama
- * account and a network round trip, so it can be unavailable for reasons a
- * local model is not. The fallback keeps the app answering instead of
- * erroring out. It is optional: without it the primary failure surfaces
- * as before.
- */
-export function resolveOllamaFallbackModel(): string | null {
-  const model = process.env.OLLAMA_FALLBACK_MODEL?.trim();
-  return model ? model : null;
-}
-
-/**
- * Where the fallback model lives.
- *
- * The fallback is a local model, so it goes to the local server even when
- * the primary model is hosted.
- */
-export function resolveOllamaFallbackHost(): string {
-  return process.env.OLLAMA_FALLBACK_HOST?.trim() || resolveOllamaHost();
-}
-
-export function resolveOllamaHost(): string {
-  return process.env.OLLAMA_HOST?.trim() || "http://127.0.0.1:11434";
-}
-
-/**
- * The hosted API, used when an API key is available.
- *
- * "https://ollama.com" serves cloud models without any local install. The
- * key is optional here: without one the app stays on the local server.
- */
-export function resolveOllamaApiHost(): string | null {
-  const host = process.env.OLLAMA_API_HOST?.trim();
-  if (host) return host;
-  return resolveOllamaApiKey() ? "https://ollama.com" : null;
-}
-
-export function resolveOllamaApiKey(): string | null {
-  const key = process.env.OLLAMA_API_KEY?.trim();
-  return key ? key : null;
+/** Render sets RENDER=true; a local Ollama server is not reachable from it. */
+function isRender(): boolean {
+  return (
+    process.env.RENDER === "true" || Boolean(process.env.RENDER_SERVICE_ID)
+  );
 }
 
 /** Never send the key to a local server: it only ever goes to Ollama. */
@@ -108,234 +127,507 @@ function isLocalHost(host: string): boolean {
   }
 }
 
-function ollamaHeaders(host: string): Record<string, string> {
-  const headers: Record<string, string> = {
-    "content-type": "application/json"
-  };
-  const key = resolveOllamaApiKey();
-  if (key && !isLocalHost(host)) {
-    headers.authorization = `Bearer ${key}`;
+function normalizeHost(host: string): string {
+  return host.replace(/\/+$/, "");
+}
+
+export function resolveOllamaHost(): string {
+  return process.env.OLLAMA_HOST?.trim() || "http://127.0.0.1:11434";
+}
+
+export function resolveOllamaApiHost(): string | null {
+  const host = process.env.OLLAMA_API_HOST?.trim();
+  if (host) return host;
+  return resolveOllamaApiKey() ? "https://ollama.com" : null;
+}
+
+export function resolveOllamaApiKey(): string | null {
+  const key = process.env.OLLAMA_API_KEY?.trim();
+  return key ? key : null;
+}
+
+export function resolveOllamaModel(): string {
+  const model = process.env.OLLAMA_MODEL?.trim();
+  if (!model) {
+    throw new ProviderConfigError("OLLAMA_MODEL is not configured");
   }
-  return headers;
+  return model;
+}
+
+export function resolveOllamaFallbackModel(): string | null {
+  const model = process.env.OLLAMA_FALLBACK_MODEL?.trim();
+  return model ? model : null;
+}
+
+export function resolveOllamaFallbackHost(): string {
+  return process.env.OLLAMA_FALLBACK_HOST?.trim() || resolveOllamaHost();
 }
 
 export function resolveOpenAIModel(): string {
   const model = process.env.OPENAI_MODEL?.trim();
   if (!model) {
-    throw new Error("OPENAI_MODEL is not configured");
+    throw new ProviderConfigError("OPENAI_MODEL is not configured");
   }
   return model;
 }
 
+export interface OpenAITarget {
+  apiKey: string;
+  model: string;
+}
+
+export function resolveOpenAITarget(): OpenAITarget {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new ProviderConfigError("OPENAI_API_KEY is not configured");
+  }
+  return { apiKey, model: resolveOpenAIModel() };
+}
+
+function assertCloudEndpoint(host: string): void {
+  let url: URL;
+  try {
+    url = new URL(host);
+  } catch {
+    throw new ProviderConfigError("OLLAMA_API_HOST is not a valid URL");
+  }
+  if (url.protocol !== "https:") {
+    throw new ProviderConfigError("OLLAMA_API_HOST must use https");
+  }
+  if (isLocalHost(host)) {
+    throw new ProviderConfigError(
+      "OLLAMA_API_HOST must not point at localhost"
+    );
+  }
+}
+
+export interface OllamaTarget {
+  mode: "cloud" | "local";
+  host: string;
+  model: string;
+  apiKey: string | null;
+}
+
 /**
- * Local Ollama chat via the documented /api/chat endpoint. Called from the
- * server only - never from browser JavaScript. Uses fetch with an
- * AbortController so timeouts are enforced. Returns the assistant text.
+ * Resolve exactly one Ollama target.
+ *
+ * A key means Ollama Cloud and requires OLLAMA_API_MODEL, per the cloud API
+ * contract. Without a key the local server is used, and on Render a loopback
+ * host is rejected up front with an actionable message instead of a timeout.
  */
-async function callOllamaModel(
-  system: string,
-  user: string,
+export function resolveOllamaTarget(): OllamaTarget {
+  const apiKey = resolveOllamaApiKey();
+  if (apiKey) {
+    const model = process.env.OLLAMA_API_MODEL?.trim();
+    if (!model) {
+      throw new ProviderConfigError("OLLAMA_API_MODEL is not configured");
+    }
+    const host = normalizeHost(resolveOllamaApiHost() ?? "https://ollama.com");
+    assertCloudEndpoint(host);
+    return { mode: "cloud", host, model, apiKey };
+  }
+
+  const model = resolveOllamaModel();
+  const host = normalizeHost(resolveOllamaHost());
+  if (isRender() && isLocalHost(host)) {
+    throw new ProviderConfigError(
+      "OLLAMA_HOST points at localhost, which is not reachable from Render"
+    );
+  }
+  return { mode: "local", host, model, apiKey: null };
+}
+
+export function assertProviderConfigured(provider: Provider): void {
+  if (provider === "openai") {
+    resolveOpenAITarget();
+  } else {
+    resolveOllamaTarget();
+  }
+}
+
+function ollamaHeaders(
+  host: string,
+  apiKey: string | null
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json"
+  };
+  if (apiKey && !isLocalHost(host)) {
+    headers.authorization = `Bearer ${apiKey}`;
+  }
+  return headers;
+}
+
+/** Low-level Ollama call. Never includes the key in an error message. */
+async function requestOllama(
+  args: GenerateArgs,
   model: string,
-  host: string
+  host: string,
+  apiKey: string | null
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
 
   let response: Response;
   try {
-    response = await fetch(`${host}/api/chat`, {
+    response = await fetch(`${normalizeHost(host)}/api/chat`, {
       method: "POST",
-      headers: ollamaHeaders(host),
+      headers: ollamaHeaders(host, apiKey),
       body: JSON.stringify({
         model,
         stream: false,
         messages: [
-          { role: "system", content: system },
-          { role: "user", content: user }
+          { role: "system", content: args.system },
+          { role: "user", content: args.user }
         ]
       }),
       signal: controller.signal
     });
   } catch (error) {
-    // fetch throws on connection refused / abort.
     const aborted = error instanceof Error && error.name === "AbortError";
-    if (aborted) {
-      throw new Error("ollama timeout");
-    }
-    throw new Error("ollama unreachable");
+    throw new ProviderError(
+      "ollama",
+      aborted ? "timeout" : "unreachable",
+      aborted ? "ollama timeout" : "ollama unreachable"
+    );
   } finally {
     clearTimeout(timer);
   }
 
   if (!response.ok) {
-    // e.g. 404 when the model is not pulled locally.
-    if (response.status === 404) {
-      throw new Error("ollama model not found");
-    }
-    // 401/403 come from a hosted model that has no valid key or session.
     if (response.status === 401 || response.status === 403) {
-      throw new Error("ollama cloud unavailable");
+      // Authentication/authorization: never retried on another model.
+      throw new ProviderError("ollama", "auth", "ollama cloud unavailable");
     }
-    throw new Error(`ollama error ${response.status}`);
+    if (response.status === 404) {
+      throw new ProviderError("ollama", "config", "ollama model not found");
+    }
+    if (response.status === 429) {
+      throw new ProviderError("ollama", "rate_limit", "ollama rate limited");
+    }
+    if (response.status >= 500) {
+      throw new ProviderError(
+        "ollama",
+        "server",
+        `ollama error ${response.status}`
+      );
+    }
+    throw new ProviderError(
+      "ollama",
+      "bad_response",
+      `ollama error ${response.status}`
+    );
   }
 
   let data: unknown;
   try {
     data = await response.json();
   } catch {
-    throw new Error("ollama malformed response");
+    throw new ProviderError(
+      "ollama",
+      "bad_response",
+      "ollama malformed response"
+    );
   }
 
   const text = (data as { message?: { content?: unknown } } | null)?.message
     ?.content;
 
   if (typeof text !== "string" || !text.trim()) {
-    throw new Error("ollama empty response");
+    throw new ProviderError("ollama", "bad_response", "ollama empty response");
   }
 
   return text.trim();
 }
 
 /**
- * Call Ollama with the primary model and fall back to the secondary one.
+ * Call Ollama with an optional same-provider model fallback.
  *
- * The model that actually answered is returned, so the response and the
- * persisted turn record the truth rather than the intention.
+ * The model fallback is only for transient failures. A 401/403 no longer
+ * retries locally: a credential problem must be visible, not hidden behind a
+ * different model. The provider-level fallback (if configured) runs after
+ * this one is exhausted.
  */
 export async function callOllama(
   args: GenerateArgs
 ): Promise<{ text: string; model: string }> {
-  const apiHost = resolveOllamaApiHost();
-  const fallback = resolveOllamaFallbackModel();
-
-  // The hosted API is only worth trying when there is a key to authorise
-  // with; without one the request would be rejected before it started, so
-  // the app goes straight to the local server instead of burning a round
-  // trip on a call that cannot succeed.
-  const canUseApi = Boolean(apiHost) && Boolean(resolveOllamaApiKey());
-
-  // With a key the primary call goes to the hosted API, using the hosted
-  // model name when one is given. Without a key it stays on the local
-  // server, which needs no credentials at all.
-  const primaryHost = canUseApi ? (apiHost as string) : resolveOllamaHost();
-  const primaryModel = canUseApi
-    ? process.env.OLLAMA_API_MODEL?.trim() || resolveOllamaModel()
-    : resolveOllamaModel();
+  const target = resolveOllamaTarget();
 
   try {
-    const text = await callOllamaModel(
-      args.system,
-      args.user,
-      primaryModel,
-      primaryHost
+    const text = await requestOllama(
+      args,
+      target.model,
+      target.host,
+      target.apiKey
     );
-    return { text, model: primaryModel };
-  } catch (primaryError) {
-    if (!fallback) {
-      throw primaryError;
+    return { text, model: target.model };
+  } catch (error) {
+    const primary =
+      error instanceof ProviderError
+        ? error
+        : new ProviderError("ollama", "bad_response", "ollama failed");
+    if (!isFallbackEligible(primary)) throw primary;
+
+    const fallbackModel = resolveOllamaFallbackModel();
+    if (!fallbackModel) throw primary;
+
+    const fallbackHost = resolveOllamaFallbackHost();
+    if (isRender() && isLocalHost(fallbackHost)) {
+      console.error(
+        "BDM ollama fallback skipped: localhost is not reachable from Render"
+      );
+      throw primary;
     }
 
     try {
-      const text = await callOllamaModel(
-        args.system,
-        args.user,
-        fallback,
-        resolveOllamaFallbackHost()
-      );
-      return { text, model: fallback };
+      const text = await requestOllama(args, fallbackModel, fallbackHost, null);
+      return { text, model: fallbackModel };
     } catch (fallbackError) {
-      // The primary failure is the more useful one to report: it names the
-      // real reason (no key, plan limit, unknown model).
-      console.error("BDM ollama fallback failed", fallbackError);
-      throw primaryError;
+      console.error(
+        "BDM ollama fallback failed",
+        fallbackError instanceof ProviderError ? fallbackError.kind : "unknown"
+      );
+      throw primary;
     }
   }
 }
 
+function statusOf(error: unknown): number | null {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === "number") return status;
+  }
+  return null;
+}
+
+/** Classify SDK errors without importing the SDK's error classes. */
+function classifyOpenAIError(error: unknown): ProviderError {
+  const status = statusOf(error);
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : "";
+
+  if (name === "APIConnectionTimeoutError" || /timed out|timeout/i.test(message)) {
+    return new ProviderError("openai", "timeout", "openai timeout");
+  }
+  if (
+    name === "APIConnectionError" ||
+    /connection error|fetch failed|ECONNREFUSED/i.test(message)
+  ) {
+    return new ProviderError("openai", "unreachable", "openai unreachable");
+  }
+  if (status === 401 || status === 403) {
+    return new ProviderError("openai", "auth", "openai unauthorized");
+  }
+  if (status === 429) {
+    return new ProviderError("openai", "rate_limit", "openai rate limited");
+  }
+  if (status !== null && status >= 500) {
+    return new ProviderError("openai", "server", `openai error ${status}`);
+  }
+  if (status !== null && status >= 400) {
+    return new ProviderError(
+      "openai",
+      "bad_response",
+      `openai error ${status}`
+    );
+  }
+  return new ProviderError("openai", "bad_response", "openai failed");
+}
+
 /**
- * OpenAI Responses API. The SDK is imported lazily so that in the default
- * Ollama mode the OpenAI module is never loaded and can never make a paid
- * request, even if a key is present in the environment.
+ * OpenAI Responses API. Imported lazily so an Ollama deployment never loads
+ * the SDK. The upstream message is never surfaced: it can contain request
+ * details, and the classified error is all a caller needs.
  */
 export async function callOpenAI(
   args: GenerateArgs
 ): Promise<{ text: string; model: string }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  const { apiKey, model } = resolveOpenAITarget();
+
+  try {
+    const { default: OpenAI } = await import("openai");
+    const client = new OpenAI({
+      apiKey,
+      timeout: OPENAI_TIMEOUT_MS,
+      maxRetries: 2
+    });
+
+    const response = await client.responses.create({
+      model,
+      instructions: args.system,
+      input: args.user,
+      max_output_tokens: MAX_OUTPUT_TOKENS
+    });
+
+    const text = response.output_text?.trim();
+    if (!text) {
+      throw new ProviderError(
+        "openai",
+        "bad_response",
+        "openai empty response"
+      );
+    }
+    return { text, model };
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw classifyOpenAIError(error);
   }
-
-  const model = resolveOpenAIModel();
-
-  const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({
-    apiKey,
-    timeout: OPENAI_TIMEOUT_MS,
-    maxRetries: 2
-  });
-
-  const response = await client.responses.create({
-    model,
-    instructions: args.system,
-    input: args.user,
-    max_output_tokens: MAX_OUTPUT_TOKENS
-  });
-
-  const text = response.output_text?.trim();
-  if (!text) {
-    throw new Error("openai empty response");
-  }
-  return { text, model };
 }
 
-/** Single entry point used by chat, research, and any tool that needs text. */
-export async function generateReply(
-  args: GenerateArgs
-): Promise<GenerateResult> {
-  const provider = resolveProvider();
-
-  if (provider === "ollama") {
-    const result = await callOllama(args);
-    return { ...result, provider };
+function toProviderError(provider: Provider, error: unknown): ProviderError {
+  if (error instanceof ProviderError) return error;
+  if (error instanceof ProviderConfigError) {
+    return new ProviderError(provider, "config", error.message);
   }
-
-  const result = await callOpenAI(args);
-  return { ...result, provider };
+  // Unknown failures are deliberately summarized: the original message may
+  // contain upstream request details or credentials.
+  return new ProviderError(provider, "bad_response", `${provider} request failed`);
 }
 
 /**
- * Redacted provider status for the UI. Never includes key values, and never
- * loads the OpenAI SDK.
+ * Single entry point used by chat, research, and email drafting.
+ *
+ * The fallback is attempted once, before any text has been returned to the
+ * caller. Chat is a single JSON response (not a stream), so there is no
+ * partially-delivered answer that could switch providers mid-flight.
  */
-export function aiStatus(): {
+export async function generateReply(
+  args: GenerateArgs
+): Promise<GenerateResult> {
+  let primary: Provider;
+  try {
+    primary = resolveProvider();
+  } catch (error) {
+    throw toProviderError("ollama", error);
+  }
+
+  try {
+    assertProviderConfigured(primary);
+  } catch (error) {
+    throw toProviderError(primary, error);
+  }
+
+  let fallback: Provider | null = null;
+  try {
+    fallback = resolveFallbackProvider(primary);
+  } catch (error) {
+    throw toProviderError(primary, error);
+  }
+
+  try {
+    const result =
+      primary === "openai" ? await callOpenAI(args) : await callOllama(args);
+    return { ...result, provider: primary };
+  } catch (error) {
+    const primaryError = toProviderError(primary, error);
+    if (!fallback || !isFallbackEligible(primaryError)) throw primaryError;
+
+    console.error("BDM AI primary failed; trying fallback", primary, primaryError.kind);
+
+    let fallbackResult: { text: string; model: string };
+    try {
+      assertProviderConfigured(fallback);
+      fallbackResult =
+        fallback === "openai" ? await callOpenAI(args) : await callOllama(args);
+    } catch (fallbackError) {
+      const secondary = toProviderError(fallback, fallbackError);
+      console.error("BDM AI fallback failed", fallback, secondary.kind);
+      // The primary failure is the more actionable one; never expose the
+      // secondary error (which could be a misconfigured fallback).
+      throw primaryError;
+    }
+
+    return {
+      ...fallbackResult,
+      provider: fallback,
+      fallbackFrom: primary
+    };
+  }
+}
+
+function ollamaReadiness(): {
+  configured: boolean;
+  model: string | null;
+  mode: "cloud" | "local" | "none";
+} {
+  if (resolveOllamaApiKey()) {
+    const model = process.env.OLLAMA_API_MODEL?.trim() || null;
+    if (!model) return { configured: false, model: null, mode: "cloud" };
+    try {
+      assertCloudEndpoint(resolveOllamaApiHost() ?? "https://ollama.com");
+    } catch {
+      return { configured: false, model, mode: "cloud" };
+    }
+    return { configured: true, model, mode: "cloud" };
+  }
+
+  const model = process.env.OLLAMA_MODEL?.trim() || null;
+  if (!model) return { configured: false, model: null, mode: "none" };
+  if (isRender() && isLocalHost(resolveOllamaHost())) {
+    return { configured: false, model, mode: "local" };
+  }
+  return { configured: true, model, mode: "local" };
+}
+
+function providerReady(provider: Provider): boolean {
+  if (provider === "openai") {
+    return Boolean(
+      process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_MODEL?.trim()
+    );
+  }
+  return ollamaReadiness().configured;
+}
+
+export interface AIStatus {
   provider: Provider;
   model: string | null;
   configured: boolean;
-} {
+  fallback: { provider: Provider | null; configured: boolean };
+}
+
+/**
+ * Redacted provider status. Never throws: an invalid or incomplete
+ * configuration is reported as `configured: false` rather than breaking the
+ * status endpoint.
+ */
+export function aiStatus(): AIStatus {
   let provider: Provider = "ollama";
   try {
     provider = resolveProvider();
   } catch {
-    return { provider: "ollama", model: null, configured: false };
-  }
-
-  if (provider === "openai") {
-    const hasKey = Boolean(process.env.OPENAI_API_KEY?.trim());
     return {
-      provider,
-      model: process.env.OPENAI_MODEL?.trim() || null,
-      configured: hasKey
+      provider: "ollama",
+      model: null,
+      configured: false,
+      fallback: { provider: null, configured: false }
     };
   }
 
-  const apiKey = resolveOllamaApiKey();
+  let model: string | null;
+  let configured: boolean;
+  if (provider === "openai") {
+    model = process.env.OPENAI_MODEL?.trim() || null;
+    configured = providerReady("openai");
+  } else {
+    const readiness = ollamaReadiness();
+    model = readiness.model;
+    configured = readiness.configured;
+  }
+
+  let fallbackProvider: Provider | null = null;
+  try {
+    fallbackProvider = resolveFallbackProvider(provider);
+  } catch {
+    fallbackProvider = null;
+  }
+
   return {
     provider,
-    model:
-      process.env.OLLAMA_API_MODEL?.trim() ||
-      process.env.OLLAMA_MODEL?.trim() ||
-      null,
-    // Local Ollama needs no key; report configured when a model is named.
-    configured: Boolean(process.env.OLLAMA_MODEL?.trim()) || Boolean(apiKey)
+    model,
+    configured,
+    fallback: {
+      provider: fallbackProvider,
+      configured: fallbackProvider ? providerReady(fallbackProvider) : false
+    }
   };
 }
