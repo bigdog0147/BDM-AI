@@ -10,6 +10,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  *
  * What they prove:
  *  - A user can only ever read/write their own conversations and messages.
+ *  - A user can only ever read/write their own long-term memories.
  *  - An unauthenticated caller gets nothing (RLS denies).
  *  - A forged message insert into another user's conversation is rejected.
  *  - Password sign-up + sign-in issues a real session.
@@ -76,6 +77,8 @@ afterAll(async () => {
     // Use the service-role style admin delete is not available with anon key;
     // instead delete rows we own, then sign out. The users remain but are
     // isolated test fixtures in a local-only database.
+    await clientA.from("bdm_memories").delete().eq("user_id", userAId);
+    await clientB.from("bdm_memories").delete().eq("user_id", userBId);
     await clientA.from("bdm_conversations").delete().eq("user_id", userAId);
     await clientB.from("bdm_conversations").delete().eq("user_id", userBId);
   } catch {
@@ -161,6 +164,91 @@ describe("BDM Supabase auth + persistence (local)", () => {
       .eq("conversation_id", convoAId)
       .order("created_at", { ascending: true });
     expect((data ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("Memory isolation (local)", () => {
+  let memoryAId: string;
+
+  itMaybe("a user can save a memory scoped to a project", async () => {
+    if (!available) return;
+    const { data, error } = await clientA
+      .from("bdm_memories")
+      .insert({
+        user_id: userAId,
+        kind: "fact",
+        content: "The alpha project ships on Fridays",
+        importance: 70,
+        metadata: { project: "alpha" }
+      })
+      .select("*")
+      .single();
+
+    expect(error).toBeNull();
+    expect(data!.user_id).toBe(userAId);
+    memoryAId = data!.id;
+  });
+
+  itMaybe("a user only sees their OWN memories (RLS isolation)", async () => {
+    if (!available) return;
+    const { data: seenByB } = await clientB.from("bdm_memories").select("*");
+    expect((seenByB ?? []).map((row) => row.id)).not.toContain(memoryAId);
+
+    const { data: seenByA } = await clientA.from("bdm_memories").select("*");
+    expect((seenByA ?? []).map((row) => row.id)).toContain(memoryAId);
+  });
+
+  itMaybe("a user CANNOT read another user's memory by id", async () => {
+    if (!available) return;
+    const { data } = await clientB
+      .from("bdm_memories")
+      .select("*")
+      .eq("id", memoryAId);
+    expect(data ?? []).toHaveLength(0);
+  });
+
+  itMaybe("a user CANNOT delete another user's memory", async () => {
+    if (!available) return;
+    await clientB.from("bdm_memories").delete().eq("id", memoryAId);
+    // Re-read as the owner: the row must still be there.
+    const { data } = await clientA
+      .from("bdm_memories")
+      .select("id")
+      .eq("id", memoryAId);
+    expect((data ?? []).map((row) => row.id)).toContain(memoryAId);
+  });
+
+  itMaybe("project scoping works through the jsonb metadata filter", async () => {
+    if (!available) return;
+    const { data: alpha } = await clientA
+      .from("bdm_memories")
+      .select("id")
+      .eq("metadata->>project", "alpha");
+    expect((alpha ?? []).map((row) => row.id)).toContain(memoryAId);
+
+    const { data: beta } = await clientA
+      .from("bdm_memories")
+      .select("id")
+      .eq("metadata->>project", "beta");
+    expect((beta ?? []).map((row) => row.id)).not.toContain(memoryAId);
+  });
+
+  itMaybe("anon cannot read or write memories", async () => {
+    if (!available) return;
+    const anon = createClient(API_URL, PUBLISHABLE_KEY, {
+      auth: { persistSession: false }
+    });
+
+    const { data } = await anon.from("bdm_memories").select("*");
+    expect(data ?? []).toHaveLength(0);
+
+    const { error } = await anon.from("bdm_memories").insert({
+      user_id: userAId,
+      kind: "fact",
+      content: "spoofed memory",
+      metadata: {}
+    });
+    expect(error).not.toBeNull();
   });
 });
 

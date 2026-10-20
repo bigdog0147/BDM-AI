@@ -5,6 +5,12 @@ interface PersistArgs {
   assistantText: string;
   model: string;
   conversationId: string | null;
+  /**
+   * Optional structured metadata for the assistant turn (for example the
+   * sources behind a research answer). Stored inside the existing jsonb
+   * `content` column, so no schema change is needed.
+   */
+  assistantSources?: unknown;
 }
 
 /**
@@ -57,7 +63,9 @@ export async function persistTurn(args: PersistArgs): Promise<string | null> {
       {
         conversation_id: conversationId,
         role: "assistant",
-        content: { text: args.assistantText },
+        content: args.assistantSources
+          ? { text: args.assistantText, sources: args.assistantSources }
+          : { text: args.assistantText },
         model: args.model
       }
     ]);

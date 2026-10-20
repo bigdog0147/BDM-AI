@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkAuthEmailBudget } from "../../../../lib/auth-email";
 import { createSupabaseServerClient } from "../../../../lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -25,6 +26,24 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json(
         { error: "Password must be at least 8 characters" },
         { status: 400 }
+      );
+    }
+
+    // Same independent budgets as the resend route: signing up sends the same
+    // confirmation email, so it must count too. When the durable store is
+    // unavailable the check degrades instead of blocking account creation.
+    const budget = await checkAuthEmailBudget({ request, email, kind: "verify" });
+    if (!budget.ok) {
+      return NextResponse.json(
+        {
+          error:
+            "Too many confirmation emails for this address. Please wait before trying again.",
+          resetAt: budget.resetAt
+        },
+        {
+          status: 429,
+          headers: { "retry-after": String(budget.retryAfterSeconds) }
+        }
       );
     }
 

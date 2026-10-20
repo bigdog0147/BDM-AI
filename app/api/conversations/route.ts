@@ -62,3 +62,51 @@ export async function POST(request: Request): Promise<Response> {
 
   return NextResponse.json({ conversation: data as Conversation });
 }
+
+/**
+ * Delete every conversation owned by the caller.
+ *
+ * bdm_messages cascades from bdm_conversations, so history and messages are
+ * removed together. Long-term memories are a separate store and are NOT
+ * touched here - clearing history must not silently wipe what the user
+ * explicitly asked BDM to remember.
+ */
+export async function DELETE(): Promise<Response> {
+  const supabase = await createSupabaseServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+
+  if (!auth.user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  const { data: owned, error: selectError } = await supabase
+    .from("bdm_conversations")
+    .select("id")
+    .eq("user_id", auth.user.id);
+
+  if (selectError) {
+    return NextResponse.json(
+      { error: "Could not clear conversation history" },
+      { status: 500 }
+    );
+  }
+
+  const ids = (owned ?? []).map((row) => (row as { id: string }).id);
+  if (ids.length === 0) {
+    return NextResponse.json({ deleted: 0 });
+  }
+
+  const { error } = await supabase
+    .from("bdm_conversations")
+    .delete()
+    .eq("user_id", auth.user.id);
+
+  if (error) {
+    return NextResponse.json(
+      { error: "Could not clear conversation history" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ deleted: ids.length });
+}

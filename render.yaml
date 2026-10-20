@@ -3,7 +3,7 @@ services:
     name: bdm-ai
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -20,4 +20,18 @@ services:
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      # Email is opt-in: all three of these plus the enabled switch are
+      # required before /api/email/send will do anything.
+      - key: BDM_EMAIL_ENABLED
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
+      # Server-only. Enables durable webhook storage; never expose this with a
+      # NEXT_PUBLIC_ prefix.
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false

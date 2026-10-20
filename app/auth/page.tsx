@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 /**
@@ -16,6 +17,37 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  async function requestEmail(kind: "resend-verification" | "password-reset") {
+    setError(null);
+    setNotice(null);
+    if (!email.trim()) {
+      setError("Enter your email address first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/auth/${kind}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim() })
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong");
+        return;
+      }
+      setNotice(
+        kind === "password-reset"
+          ? "If that address has an account, a password reset email is on its way."
+          : "If that address needs confirmation, a new verification email is on its way."
+      );
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,6 +136,32 @@ export default function AuthPage() {
             {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </button>
         </form>
+
+        <div style={styles.links}>
+          {mode === "signin" && (
+            <button
+              type="button"
+              style={styles.link}
+              disabled={busy}
+              onClick={() => void requestEmail("password-reset")}
+            >
+              Forgot password?
+            </button>
+          )}
+          {mode === "signin" && (
+            <button
+              type="button"
+              style={styles.link}
+              disabled={busy}
+              onClick={() => void requestEmail("resend-verification")}
+            >
+              Resend verification email
+            </button>
+          )}
+          <Link style={styles.link} href="/">
+            Back to chat
+          </Link>
+        </div>
       </div>
     </main>
   );
@@ -178,6 +236,22 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     borderRadius: 8,
     fontSize: 15,
+    cursor: "pointer"
+  },
+  links: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 14,
+    marginTop: 16,
+    justifyContent: "center"
+  },
+  link: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    color: "#9aa3b2",
+    fontSize: 13,
+    textDecoration: "underline",
     cursor: "pointer"
   }
 };
