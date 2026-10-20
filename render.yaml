@@ -15,6 +15,17 @@ services:
       # Change only to a model your account can actually access.
       - key: OPENAI_MODEL
         value: gpt-5.6-luna
+      # Ollama Cloud is the primary provider for this service. Local Ollama
+      # (OLLAMA_HOST / OLLAMA_MODEL) is not reachable from Render.
+      # Set OLLAMA_API_KEY in the Render dashboard; never commit it here.
+      - key: AI_PROVIDER
+        value: ollama
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: OLLAMA_API_MODEL
+        value: gemma4:31b
+      - key: OLLAMA_API_HOST
+        value: https://ollama.com
       - key: BDM_WEB_SEARCH_ENABLED
         value: "true"
       - key: NEXT_PUBLIC_SUPABASE_URL
