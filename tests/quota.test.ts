@@ -85,8 +85,17 @@ describe("limit configuration", () => {
 
     expect(status.store).toBe("database");
     expect(status.migration).toContain("0002_usage_quotas.sql");
+    expect(status.migrationState).toBe("unknown");
     expect(status.limits.imageDaily).toBeGreaterThan(0);
     expect(JSON.stringify(status)).not.toContain("test-key");
+  });
+
+  it("does not claim a durable store when Supabase is not configured", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+    const { quotaStatus } = await import("../lib/quota");
+    expect(quotaStatus().store).toBe("not_configured");
   });
 });
 

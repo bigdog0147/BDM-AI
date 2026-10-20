@@ -235,14 +235,21 @@ export function retryAfterSeconds(resetAt: string): number {
  * status endpoint stays cheap and never fails because of a quota outage.
  */
 export function quotaStatus(): {
-  store: "database";
+  store: "database" | "not_configured";
   migration: string;
+  migrationState: "unknown";
   limits: QuotaLimits;
   windows: Record<string, string>;
 } {
   return {
-    store: "database",
+    // This is the store the code is configured to use, not proof that it is
+    // reachable. Endpoints fail closed with `quota_unavailable` until the
+    // migration below has been applied.
+    store: hasSupabase() ? "database" : "not_configured",
     migration: "supabase/migrations/0002_usage_quotas.sql",
+    // /api/status makes no database call, so it cannot confirm that the
+    // migration has been applied. Do not turn this into a false "applied".
+    migrationState: "unknown",
     limits: quotaLimits(),
     windows: {
       burst: "10 minutes (in-process guard)",
