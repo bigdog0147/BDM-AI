@@ -199,11 +199,17 @@ async function callOllama(
   const apiHost = resolveOllamaApiHost();
   const fallback = resolveOllamaFallbackModel();
 
+  // The hosted API is only worth trying when there is a key to authorise
+  // with; without one the request would be rejected before it started, so
+  // the app goes straight to the local server instead of burning a round
+  // trip on a call that cannot succeed.
+  const canUseApi = Boolean(apiHost) && Boolean(resolveOllamaApiKey());
+
   // With a key the primary call goes to the hosted API, using the hosted
   // model name when one is given. Without a key it stays on the local
   // server, which needs no credentials at all.
-  const primaryHost = apiHost || resolveOllamaHost();
-  const primaryModel = apiHost
+  const primaryHost = canUseApi ? (apiHost as string) : resolveOllamaHost();
+  const primaryModel = canUseApi
     ? process.env.OLLAMA_API_MODEL?.trim() || resolveOllamaModel()
     : resolveOllamaModel();
 
