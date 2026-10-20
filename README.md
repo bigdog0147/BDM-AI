@@ -36,6 +36,35 @@ Row Level Security is enabled on these tables.
 
 Never commit API keys or secret credentials.
 
+## Known dependency advisories
+
+`npm audit` reports 5 high-severity advisories. All of them are **dev
+tooling** and none of them ship with the application — the chain starts
+inside the Next.js lint plugin:
+
+```
+eslint-config-next
+└── @next/eslint-plugin-next
+    └── fast-glob
+        └── micromatch
+            └── braces      ← GHSA-vfj7-8cjw-p6xm
+```
+
+`braces` is published only up to `3.0.3`, and the advisory covers
+`<= 3.0.3` — the newest release is the affected one, so no upgrade can clear
+it. `npm audit --omit=dev` (the production tree) reports **0**.
+
+How this is handled:
+
+- **Production dependencies are gated in CI.** `npm audit --omit=dev
+  --audit-level=high` must pass; it is green today and blocks on any
+  high-or-worse advisory in the shipped tree.
+- **Dev advisories are ratcheted, not ignored.** A weekly job compares the
+  count against `.audit-baseline.json` and fails only if it rises. When an
+  upstream fix lands and the count drops, lower the baseline.
+- The lint step is bounded by `timeout-minutes: 10`, so a pathological glob
+  can fail a pipeline rather than stall one.
+
 ## Planned upgrades
 
 1. Supabase authentication and protected chat
