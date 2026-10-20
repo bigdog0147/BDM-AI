@@ -491,4 +491,20 @@ describe("hosted model with a local fallback", () => {
     const headers = seen[0].init?.headers as Record<string, string>;
     expect(headers.authorization).toBeUndefined();
   });
+
+  it("skips the hosted API entirely when it is configured without a key", async () => {
+    // A hosted host without a key would be rejected before it started, so
+    // the request must not be attempted at all.
+    process.env.OLLAMA_API_HOST = "https://ollama.com";
+    process.env.OLLAMA_API_MODEL = "gemma4:31b";
+    delete process.env.OLLAMA_API_KEY;
+    const { seen } = mockOllamaSequence([{ body: ollamaOk("local answer") }]);
+
+    const data = await (await post({ message: "hi" })).json();
+    expect(data.text).toBe("local answer");
+    expect(seen).toHaveLength(1);
+    expect(seen[0].url).toBe("http://127.0.0.1:11434/api/chat");
+    const headers = seen[0].init?.headers as Record<string, string>;
+    expect(headers.authorization).toBeUndefined();
+  });
 });
