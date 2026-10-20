@@ -8,7 +8,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: "24"
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
@@ -19,3 +19,11 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: BDM_DEFAULT_PROVIDER
+        value: "openai"
+      - key: OLLAMA_ENDPOINT
+        value: "https://ollama.com"
+      - key: OLLAMA_MODEL
+        value: "gemma4:cloud"

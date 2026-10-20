@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# Node.js
+node_modules
+npm-debug.log*
+.next
+out
+build
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker
+.docker
+docker-compose.override.yml
+
+# Test coverage
+coverage
+
+# Misc
+*.tmp
+*.temp
+*.zip
