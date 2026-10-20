@@ -32,7 +32,7 @@ jobs:
           OPENAI_MODEL: gpt-5.6-luna
 
   audit:
-    name: dependency audit
+    name: production dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -42,10 +42,34 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      # Critical only: the high advisories currently reported are in lint
-      # tooling (eslint-config-next -> @next/eslint-plugin-next ->
-      # fast-glob -> micromatch -> braces) with no upstream fix available,
-      # because braces 3.0.3 is both the latest and the affected release.
-      # This gate turns red if anything genuinely serious appears.
-      - run: npm audit --audit-level=critical
+      # Production dependencies only: this is what actually ships, and it is
+      # clean today. Any high-or-worse advisory in the shipped tree blocks.
+      - run: npm audit --omit=dev --audit-level=high
+
+  audit-dev:
+    name: dev dependency audit (ratchet)
+    # Weekly only, and it is a ratchet rather than a gate: the current dev
+    # advisories have no upstream fix (braces 3.0.3 is both the newest
+    # release and the affected one), so blocking on them would leave the
+    # pipeline permanently red. This fails only when the count goes UP, and
+    # passes silently when an upstream fix lands and the count drops.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Compare against the recorded baseline
+        run: |
+          count=$({ npm audit --json 2>/dev/null || true; } | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(j.metadata.vulnerabilities.total)})")
+          baseline=$(node -p "require('./.audit-baseline.json').count")
+          echo "dev advisories: $count (baseline $baseline)"
+          if [ "$count" -gt "$baseline" ]; then
+            echo "::error::dev dependency advisories rose above the baseline"
+            exit 1
+          fi
 
