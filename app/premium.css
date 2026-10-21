@@ -111,6 +111,11 @@
     0 16px 36px rgba(21, 94, 239, 0.42);
 }
 
+/* Keep the gold rim visible at rest: the disabled state dims it via opacity 0.45. */
+.send-btn:disabled {
+  box-shadow: 0 0 0 1px rgba(245, 196, 81, 0.34);
+}
+
 /* --------------------------------------------------------- gold focus on composer */
 
 .composer-box:focus-within {
