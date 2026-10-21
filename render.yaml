@@ -46,7 +46,7 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
-        value: https://bdm-ai.onrender.com/auth/callback/google
+        value: https://bdmai.cloud/auth/callback/google
       # Email is opt-in: all three of these plus the enabled switch are
       # required before /api/email/send will do anything.
       - key: BDM_EMAIL_ENABLED
