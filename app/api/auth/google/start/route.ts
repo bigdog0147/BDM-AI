@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../../lib/auth";
+import { requestOrigin } from "../../../../../lib/http";
 import {
   buildGoogleAuthorizationUrl,
   createOAuthTransaction,
@@ -21,7 +22,9 @@ function errorRedirect(
 ): NextResponse {
   const path =
     mode === "link" ? `/settings?google_error=${code}` : `/auth?error=${code}`;
-  return NextResponse.redirect(new URL(path, request.url));
+  // The base is the public origin, not request.url: behind Render the latter
+  // is the server's internal address, and the user would be sent there.
+  return NextResponse.redirect(new URL(path, requestOrigin(request)));
 }
 
 /**
@@ -43,7 +46,7 @@ export async function GET(request: Request): Promise<Response> {
     return errorRedirect(request, mode, "google_store_not_configured");
   }
 
-  const config = getGoogleConfig(request.url);
+  const config = getGoogleConfig(requestOrigin(request));
   if (!config.ok) {
     return errorRedirect(
       request,

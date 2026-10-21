@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { currentUser } from "../../../../lib/auth";
+import { requestOrigin } from "../../../../lib/http";
 import {
   exchangeGoogleCode,
   getGoogleConfig,
@@ -44,7 +45,9 @@ function finalize(
   path: string,
   pending: PendingCookie[]
 ): NextResponse {
-  const response = NextResponse.redirect(new URL(path, request.url));
+  // The base is the public origin, not request.url: behind Render the latter
+  // is the server's internal address, and the user would be sent there.
+  const response = NextResponse.redirect(new URL(path, requestOrigin(request)));
   for (const cookie of pending) {
     response.cookies.set(cookie.name, cookie.value, cookie.options);
   }
@@ -92,6 +95,8 @@ export async function GET(request: NextRequest): Promise<Response> {
   );
   const mode: GoogleMode = transaction?.mode ?? "signin";
 
+  // The query string is read from the incoming request; only the origin it is
+  // resolved against has to be the public one.
   const url = new URL(request.url);
   const providerError = url.searchParams.get("error");
   if (providerError) {
@@ -112,7 +117,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return finalize(request, mode, errorPath(mode, "google_state"), []);
   }
 
-  const config = getGoogleConfig(request.url);
+  const config = getGoogleConfig(requestOrigin(request));
   if (!config.ok) {
     return finalize(
       request,
