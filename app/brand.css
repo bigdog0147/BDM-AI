@@ -1,0 +1,120 @@
+
+
+@keyframes emblem-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.hero .welcome-eyebrow {
+  position: relative;
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bdm-gold);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bdm-warning);
+  box-shadow: 0 0 10px rgba(255, 213, 154, 0.5);
+  flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------------- responsive */
+
+
+/* The emblem carries the empty state, so it gets room to breathe. */
+.welcome-mark {
+  filter: drop-shadow(0 16px 40px rgba(245, 196, 81, 0.28))
+    drop-shadow(0 0 44px rgba(21, 94, 239, 0.25));
+}
+
+.welcome-mark img {
+  width: 118px;
+  height: auto;
+}
+
+/* Gold-framed action tiles, in the language of the brand. */
+.suggestion .suggestion-icon,
+.welcome .suggestion-icon {
+  border-color: var(--bdm-line);
+  background: rgba(21, 94, 239, 0.14);
+  color: var(--bdm-electric);
+}
+
+.suggestion:hover .suggestion-icon,
+.welcome .suggestion:hover .suggestion-icon {
+  background: rgba(245, 196, 81, 0.14);
+  color: var(--bdm-gold);
+}
+
+@media (max-width: 1280px) {
+  .app { }
+}
+
+/* --------------------------------------------------- narrow-screen safety */
+
+/* Nothing may push the workspace wider than the viewport. */
+@media (max-width: 760px) {
+  .app,
+  .workspace,
+  .workspace-main,
+  .chat-scroll,
+  .chat-inner,
+  .welcome,
+  .composer,
+  .topbar {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .suggestions,
+  .suggestion-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .suggestion,
+  .suggestion-card {
+    min-width: 0;
+  }
+
+  .suggestion-text,
+  .suggestion-card > span {
+    min-width: 0;
+  }
+
+  .welcome-title,
+  .hero-title {
+    font-size: 26px;
+  }
+
+  .topbar-actions {
+    flex: 0 0 auto;
+  }
+
+  .topbar-actions .btn span,
+  .topbar-actions .btn {
+    white-space: nowrap;
+  }
+
+  .composer-row,
+  .composer {
+    flex-wrap: wrap;
+  }
+
+  .composer button,
+  .send-btn {
+    flex: 0 0 auto;
+  }
+}

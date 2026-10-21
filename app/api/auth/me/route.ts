@@ -14,8 +14,16 @@ export async function GET(): Promise<Response> {
       return NextResponse.json({ user: null });
     }
 
+    const providers = Array.from(
+      new Set(
+        (data.user.identities ?? [])
+          .map((identity) => identity.provider)
+          .filter((provider): provider is string => Boolean(provider))
+      )
+    );
+
     return NextResponse.json({
-      user: { id: data.user.id, email: data.user.email }
+      user: { id: data.user.id, email: data.user.email, providers }
     });
   } catch {
     return NextResponse.json({ user: null });

@@ -8,7 +8,14 @@ const eslintConfig = [
   ...coreWebVitals,
   ...typescript,
   {
-    ignores: [".next/**", "node_modules/**", "coverage/**"]
+    // `private-audit/` holds local backups and environment inventories. It is
+    // excluded from type checking too, so it must not be linted either.
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "coverage/**",
+      "private-audit/**"
+    ]
   }
 ];
 

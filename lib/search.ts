@@ -4,6 +4,7 @@
  * Three interchangeable backends, all optional:
  *   - brave    (BRAVE_SEARCH_API_KEY)  GET  https://api.search.brave.com/res/v1/web/search
  *   - tavily   (TAVILY_API_KEY)        POST https://api.tavily.com/search
+ *              (TAVILY_KEYLESS=1 uses Tavily's rate-limited keyless mode)
  *   - searxng  (SEARXNG_URL)           GET  {SEARXNG_URL}/search?format=json
  *
  * Verified against the providers' current documentation (Brave Web Search
@@ -55,6 +56,15 @@ export type SearchResult = SearchSuccess | SearchFailure;
 const SEARCH_TIMEOUT_MS = 15_000;
 const MAX_RESULTS = 8;
 
+/**
+ * Tavily's keyless mode is rate-limited and meant for local development, so it
+ * is opt-in: a deployed instance can never fall into it by accident.
+ */
+function tavilyKeylessEnabled(): boolean {
+  const value = process.env.TAVILY_KEYLESS?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
 function providerFromEnv(): SearchProviderName | null {
   const explicit = process.env.BDM_SEARCH_PROVIDER?.trim().toLowerCase();
   if (
@@ -68,6 +78,7 @@ function providerFromEnv(): SearchProviderName | null {
   // Auto-detect, in order of signal quality.
   if (process.env.BRAVE_SEARCH_API_KEY?.trim()) return "brave";
   if (process.env.TAVILY_API_KEY?.trim()) return "tavily";
+  if (tavilyKeylessEnabled()) return "tavily";
   if (process.env.SEARXNG_URL?.trim()) return "searxng";
   return null;
 }
@@ -88,7 +99,7 @@ export function searchStatus(): {
     provider === "brave"
       ? Boolean(process.env.BRAVE_SEARCH_API_KEY?.trim())
       : provider === "tavily"
-        ? Boolean(process.env.TAVILY_API_KEY?.trim())
+        ? Boolean(process.env.TAVILY_API_KEY?.trim()) || tavilyKeylessEnabled()
         : Boolean(process.env.SEARXNG_URL?.trim());
 
   return { provider, configured };
@@ -216,14 +227,18 @@ async function searchTavily(
   limit: number
 ): Promise<SearchSource[]> {
   const key = process.env.TAVILY_API_KEY?.trim();
-  if (!key) throw new Error("search not configured");
+  const keyless = !key && tavilyKeylessEnabled();
+  if (!key && !keyless) throw new Error("search not configured");
+
+  const headers: Record<string, string> = {
+    "content-type": "application/json"
+  };
+  if (key) headers.authorization = `Bearer ${key}`;
+  else headers["x-tavily-access-mode"] = "keyless";
 
   const response = await fetch("https://api.tavily.com/search", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${key}`
-    },
+    headers,
     body: JSON.stringify({
       query,
       max_results: limit,

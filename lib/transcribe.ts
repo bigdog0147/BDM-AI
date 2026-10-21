@@ -118,6 +118,7 @@ export type TranscriptionFailureReason =
   | "not_configured"
   | "empty_transcript"
   | "timeout"
+  | "no_credit"
   | "failed";
 
 export type TranscriptionResult =
@@ -177,6 +178,10 @@ export async function transcribeAudio(input: {
 
     if (name === "APIConnectionTimeoutError" || /timeout|timed out/i.test(message)) {
       return { ok: false, reason: "timeout", message: "transcription timeout" };
+    }
+    // An exhausted OpenAI balance arrives as a 429 and is not a rate limit.
+    if (/insufficient_quota|no credits remaining|billing/i.test(message)) {
+      return { ok: false, reason: "no_credit", message: "transcription out of credit" };
     }
     return { ok: false, reason: "failed", message: "transcription failed" };
   }

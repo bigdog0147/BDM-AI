@@ -299,6 +299,7 @@ describe("POST /api/email/send", () => {
 
   it("requires authentication", async () => {
     configureEmail();
+    h.currentUser.mockResolvedValue(null);
     const { POST } = await import("../app/api/email/send/route");
     const response = await POST(
       request({ to: "a@b.com", subject: "s", body: "b", confirmed: true })

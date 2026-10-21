@@ -5,6 +5,10 @@ node_modules
 .env.*.local
 .env.production
 .env.production.local
+# Local test environment files can contain real secrets (service-role key,
+# OAuth client secret). Never commit them.
+.env.local.test
+.env.*.test
 coverage
 .DS_Store
 npm-debug.log*
@@ -12,3 +16,7 @@ npm-debug.log*
 # TypeScript build artifacts
 *.tsbuildinfo
 next-env.d.ts
+
+# Local audit trail: file backups, environment inventories and the convergence
+# script. These are local working aids and must never be committed.
+private-audit/

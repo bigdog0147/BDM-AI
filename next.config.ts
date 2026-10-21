@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The dev indicator sits in the bottom-left corner and overlaps the
+  // "Sign in with Google" button on the auth screen. It is a development
+  // affordance only, so it is turned off for the local preview.
+  devIndicators: false,
   // Next blocks dev-only assets (/_next/hmr) when the request Origin host
   // differs from the one the dev server started on. Opening the app via
   // http://127.0.0.1:3001 or the LAN URL instead of http://localhost:3001

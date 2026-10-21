@@ -1,29 +1,35 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Sidebar, { type WorkspaceView } from "./components/Sidebar";
+import ResearchView from "./components/ResearchView";
 import MemoryPanel from "./components/MemoryPanel";
+import Modal from "./components/Modal";
 import ImagePanel, { type GeneratedImage } from "./components/ImagePanel";
 import EmailPanel from "./components/EmailPanel";
 import VoiceRecorder from "./components/VoiceRecorder";
+import { Icon, GoogleIcon } from "./components/Icons";
+import Markdown from "./components/Markdown";
+import Welcome from "./components/Welcome";
+import type {
+  AuthUser,
+  CapabilityStatus,
+  ConversationSummary,
+  MemoryUsed,
+  MessageMemoryAction,
+  Source
+} from "./components/types";
+import { displayNameFromEmail, greetingFor } from "../lib/workspace";
 
-type AuthUser = { id: string; email?: string } | null;
-
-type Source = {
-  index: number;
-  title: string;
-  url: string;
-  domain: string;
-  publishedDate?: string | null;
-  snippet?: string;
-};
-
-type MemoryAction = {
-  type: "saved" | "forgotten" | "blocked_secret" | "unavailable" | "not_found";
-  count?: number;
-  contents?: string[];
-  memory?: { id: string; content: string; kind: string };
-};
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -31,95 +37,57 @@ type ChatMessage = {
   kind?: "chat" | "research" | "image" | "error";
   sources?: Source[];
   image?: GeneratedImage;
-  memoryAction?: MemoryAction;
-  memoriesUsed?: { id: string; content: string; kind: string }[];
+  memoryAction?: MessageMemoryAction;
+  memoriesUsed?: MemoryUsed[];
   warning?: string;
+  /** Set on a failed turn so it can be run again without duplicating it. */
+  retryText?: string;
 };
 
-type Status = {
-  signedIn: boolean;
-  memory: { available: boolean };
-  ai: {
-    provider: string;
-    model: string | null;
-    configured: boolean;
-    fallback?: { provider: string | null; configured: boolean };
-  };
-  search: { provider: string | null; configured: boolean };
-  images: { provider: string | null; model: string | null; configured: boolean };
-  voice: {
-    provider: string | null;
-    model: string | null;
-    configured: boolean;
-    retention: string;
-    maxDurationSeconds: number;
-  };
-  email?: {
-    provider: string | null;
-    configured: boolean;
-    enabled: boolean;
-  };
-};
-
-const GREETING: ChatMessage = {
-  role: "assistant",
-  content: "Hello. I’m BDM, your personal AI. What are we working on?"
-};
-
-function memoryBadge(action: MemoryAction): { text: string; tone: string } {
-  switch (action.type) {
-    case "saved":
-      return {
-        text: `Saved to memory (${action.memory?.kind ?? "fact"})`,
-        tone: "ok"
-      };
-    case "forgotten":
-      return {
-        text:
-          action.count === 1
-            ? "Forgot 1 memory"
-            : `Forgot ${action.count ?? 0} memories`,
-        tone: "ok"
-      };
-    case "blocked_secret":
-      return { text: "Not saved — looks like a secret", tone: "warn" };
-    case "unavailable":
-      return { text: "Memory unavailable — nothing saved", tone: "warn" };
-    case "not_found":
-      return { text: "No matching memory found", tone: "warn" };
-    default:
-      return { text: "Memory action", tone: "" };
-  }
-}
-
+/**
+ * The workspace.
+ *
+ * One focused conversation column, a compact navigation sidebar, and a
+ * composer that carries the three ways to talk to BDM: type, speak, or
+ * research the live web. Provider diagnostics live on the Settings page, not
+ * here.
+ */
 export default function Home() {
   const router = useRouter();
+
   const [user, setUser] = useState<AuthUser>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [status, setStatus] = useState<Status | null>(null);
+  const [status, setStatus] = useState<CapabilityStatus | null>(null);
+
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [researchMode, setResearchMode] = useState(false);
-  const [showMemory, setShowMemory] = useState(false);
-  const [showImage, setShowImage] = useState(false);
+  const [view, setView] = useState<WorkspaceView>("chat");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const [showImage, setShowImage] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const sendingRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
 
+  // ---- session ---------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
     fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d: { user: AuthUser }) => {
-        if (!cancelled) {
-          setUser(d.user);
-          setAuthChecked(true);
-        }
+      .then((response) => response.json())
+      .then((data: { user: AuthUser }) => {
+        if (cancelled) return;
+        setUser(data.user);
+        setAuthChecked(true);
       })
       .catch(() => {
         if (!cancelled) setAuthChecked(true);
@@ -129,132 +97,149 @@ export default function Home() {
     };
   }, []);
 
-  // Capability status: provider names and booleans only, never key values.
+  // Capability flags only. The full provider report lives on /settings.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/status")
-      .then((r) => r.json())
-      .then((d: Status) => {
-        if (!cancelled) setStatus(d);
+      .then((response) => response.json())
+      .then((data: CapabilityStatus) => {
+        if (!cancelled) setStatus(data);
       })
       .catch(() => {
-        // Status is informational; the app still works without it.
+        // Capability flags are informational; the app still works without them.
       });
     return () => {
       cancelled = true;
     };
   }, [user]);
 
-  // Restore the most recent conversation on refresh.
+  const loadConversations = useCallback(async () => {
+    try {
+      const response = await fetch("/api/conversations", { cache: "no-store" });
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        conversations?: ConversationSummary[];
+      };
+      setConversations(data.conversations ?? []);
+    } catch {
+      // History is a convenience: a failure must not break the chat.
+    }
+  }, []);
+
   useEffect(() => {
-    if (!user || historyLoaded) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const listRes = await fetch("/api/conversations");
-        const listData = (await listRes.json()) as {
-          conversations?: { id: string }[];
-        };
-        const first = listData.conversations?.[0];
-        if (cancelled) return;
-        if (!first) {
-          setHistoryLoaded(true);
-          return;
-        }
-        const msgRes = await fetch(`/api/conversations/${first.id}/messages`);
-        const msgData = (await msgRes.json()) as {
-          messages?: {
-            role: string;
-            content?: { text?: string; sources?: Source[] };
-          }[];
-        };
-        if (cancelled) return;
+    if (!user) return;
+    void loadConversations();
+  }, [user, loadConversations]);
 
-        const history: ChatMessage[] = (msgData.messages ?? [])
-          .filter((m) => m.role === "user" || m.role === "assistant")
-          .map((m) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content?.text ?? "",
-            sources: Array.isArray(m.content?.sources)
-              ? (m.content?.sources as Source[])
-              : undefined
-          }));
+  const loadConversation = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${id}/messages`, {
+        cache: "no-store"
+      });
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        messages?: {
+          role: string;
+          content?: { text?: string; sources?: Source[] };
+        }[];
+      };
+      const history: ChatMessage[] = (data.messages ?? [])
+        .filter((message) => message.role === "user" || message.role === "assistant")
+        .map((message) => ({
+          role: message.role as "user" | "assistant",
+          content: message.content?.text ?? "",
+          kind: message.content?.sources?.length ? "research" : "chat",
+          sources: Array.isArray(message.content?.sources)
+            ? message.content.sources
+            : undefined
+        }));
+      setConversationId(id);
+      setMessages(history);
+      setView("chat");
+    } catch {
+      // Keep the current conversation if it cannot be loaded.
+    }
+  }, []);
 
-        setConversationId(first.id);
-        setMessages(history.length ? history : [GREETING]);
-      } catch {
-        // Best-effort restore; the greeting stays if it fails.
-      } finally {
-        if (!cancelled) setHistoryLoaded(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, historyLoaded]);
+  const newChat = useCallback(() => {
+    abortRef.current?.abort();
+    setConversationId(null);
+    setMessages([]);
+    setInput("");
+    setResearchMode(false);
+    setView("chat");
+    setMobileOpen(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
 
   async function signOut() {
     await fetch("/api/auth/signout", { method: "POST" });
     setUser(null);
     setConversationId(null);
-    setHistoryLoaded(false);
-    setMessages([GREETING]);
-    setShowMemory(false);
-    setShowImage(false);
+    setMessages([]);
     setShowVoice(false);
+    setShowImage(false);
     setShowEmail(false);
+    setShowMemory(false);
     router.refresh();
   }
 
-  function clearHistory() {
-    setConversationId(null);
-    setMessages([GREETING]);
-  }
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const text = input.trim();
-    // busy + ref together stop a double click from sending twice.
+  // ---- sending ---------------------------------------------------------
+  async function submit(
+    event?: FormEvent,
+    options?: { text?: string; appendUser?: boolean }
+  ) {
+    event?.preventDefault();
+    const text = (options?.text ?? input).trim();
+    // `sendingRef` is the duplicate-submission guard: a second click, an
+    // Enter key, or a retry can never create a second user message.
     if (!text || busy || sendingRef.current) return;
-    sendingRef.current = true;
 
-    setMessages((current) => [...current, { role: "user", content: text }]);
-    setInput("");
+    sendingRef.current = true;
+    if (options?.appendUser !== false) {
+      setMessages((current) => [...current, { role: "user", content: text }]);
+      setInput("");
+    }
     setBusy(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       if (researchMode) {
         const response = await fetch("/api/research", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ query: text, conversationId })
+          body: JSON.stringify({ query: text, conversationId }),
+          signal: controller.signal
         });
         const data = (await response.json()) as {
           answer?: string;
           sources?: Source[];
-          citations?: number[];
           missingCitations?: boolean;
           conversationId?: string | null;
           error?: string;
+          reason?: string;
         };
 
+        if (typeof data.conversationId === "string" && data.conversationId) {
+          setConversationId(data.conversationId);
+        }
+
         if (!response.ok || typeof data.answer !== "string") {
-          // A synthesis failure can still carry real sources; show both the
-          // error and what was actually found.
           setMessages((current) => [
             ...current,
             {
               role: "assistant",
-              content: `System error: ${data.error || "Research failed."}`,
+              content:
+                data.error ??
+                "Research could not complete. Nothing was added to the conversation.",
               kind: "error",
-              sources: data.sources
+              sources: data.sources,
+              retryText: text
             }
           ]);
           return;
-        }
-
-        if (typeof data.conversationId === "string" && data.conversationId) {
-          setConversationId(data.conversationId);
         }
 
         setMessages((current) => [
@@ -273,13 +258,14 @@ export default function Home() {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ message: text, conversationId })
+          body: JSON.stringify({ message: text, conversationId }),
+          signal: controller.signal
         });
         const data = (await response.json()) as {
           text?: string;
           conversationId?: string | null;
-          memoryAction?: MemoryAction;
-          memoriesUsed?: { id: string; content: string; kind: string }[];
+          memoryAction?: MessageMemoryAction;
+          memoriesUsed?: MemoryUsed[];
           error?: string;
         };
 
@@ -301,326 +287,612 @@ export default function Home() {
           }
         ]);
       }
+
+      void loadConversations();
     } catch (error) {
+      const aborted =
+        error instanceof Error &&
+        (error.name === "AbortError" || /abort/i.test(error.message));
+
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
-          content:
-            error instanceof Error
+          content: aborted
+            ? "Stopped. The request was cancelled in your browser, so the server may still have finished it."
+            : error instanceof Error
               ? `System error: ${error.message}`
               : "System error.",
-          kind: "error"
+          kind: "error",
+          retryText: text
         }
       ]);
     } finally {
       setBusy(false);
       sendingRef.current = false;
+      abortRef.current = null;
     }
   }
 
+  function stopGenerating() {
+    abortRef.current?.abort();
+  }
+
+  function retry(message: ChatMessage) {
+    const text = message.retryText;
+    if (!text || busy) return;
+    // Drop the failed turn first so the retry cannot duplicate it.
+    setMessages((current) => current.slice(0, current.length - 1));
+    void submit(undefined, { text, appendUser: false });
+  }
+
   function useTranscript(text: string) {
-    // Review happens in the composer: the transcript is not auto-sent.
+    // The transcript is reviewed in the composer; it is never auto-sent.
+    setView("chat");
     setInput((current) => (current ? `${current} ${text}` : text));
+    setShowVoice(false);
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
+  function focusResearch() {
+    setView("chat");
+    setResearchMode(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  // Deep link for the installed app: `/?view=research` opens the workspace
+  // with Research already armed. The query is read in an effect rather than
+  // through `useSearchParams`, so the page can stay statically prerendered.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("view");
+    if (requested === "research") {
+      setResearchMode(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, []);
+
+  // Keep the newest turn in view without stealing focus.
+  useEffect(() => {
+    if (!messages.length) return;
+    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+  }, [messages, busy]);
+
+  // ---- derived ---------------------------------------------------------
+  const displayName = useMemo(
+    () => displayNameFromEmail(user?.email ?? null),
+    [user?.email]
+  );
+  const signedIn = Boolean(user);
+  const accountInitial = (user?.email?.[0] ?? "B").toUpperCase();
+  const emptyChat = messages.length === 0;
   const voiceReady = status?.voice.configured ?? false;
   const imageReady = status?.images.configured ?? false;
   const researchReady = status?.search.configured ?? false;
+  const emailReady = status?.email?.configured ?? false;
 
+  const activeConversation = useMemo(
+    () => conversations.find((item) => item.id === conversationId) ?? null,
+    [conversations, conversationId]
+  );
+
+  const topbarTitle =
+    view === "research"
+      ? "Research"
+      : activeConversation?.title || (emptyChat ? "New chat" : "Conversation");
+  const topbarSub =
+    view === "research"
+      ? "Ask the live web and get an answer with sources."
+      : emptyChat
+        ? "Ask anything, speak a note, or research the web."
+        : "Your conversation is saved to your account.";
+
+  // ---- render ----------------------------------------------------------
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <div className="brand">BDM</div>
-          <div className="subtitle">Personal AI</div>
-        </div>
-        <div className="status">
-          {authChecked && user ? (
-            <span className="auth-actions">
-              <button
-                type="button"
-                className="auth-btn"
-                onClick={() => setShowMemory(true)}
-                aria-haspopup="dialog"
-              >
-                Memory
-              </button>
-              <span className="auth-user">{user.email}</span>
-              <button type="button" className="auth-btn" onClick={signOut}>
-                Sign out
-              </button>
-            </span>
-          ) : authChecked ? (
-            <a href="/auth" className="auth-btn">
-              Sign in
-            </a>
-          ) : (
-            <span />
-          )}{" "}
-          <span className="status-dot" aria-hidden="true" />
-          Core online
-        </div>
-      </header>
+    <div className={`app${collapsed ? " sidebar-collapsed" : ""}`}>
+      <Sidebar
+        user={user}
+        conversations={conversations}
+        activeConversationId={conversationId}
+        view={view}
+        mobileOpen={mobileOpen}
+        collapsed={collapsed}
+        onCloseMobile={() => setMobileOpen(false)}
+        onToggleCollapse={() => setCollapsed((value) => !value)}
+        onNewChat={newChat}
+        onSelectConversation={(id) => void loadConversation(id)}
+        onSelectView={(next) => {
+          if (next === "research") {
+            focusResearch();
+          } else {
+            setView("chat");
+          }
+          setMobileOpen(false);
+        }}
+        onOpenVoice={() => {
+          setShowVoice(true);
+          setMobileOpen(false);
+        }}
+        onOpenSaved={() => {
+          setShowMemory(true);
+          setMobileOpen(false);
+        }}
+        onOpenSettings={() => {
+          router.push("/settings");
+        }}
+        onOpenHelp={() => {
+          setShowHelp(true);
+          setMobileOpen(false);
+        }}
+        onSignOut={() => void signOut()}
+      />
 
-      {status && (
-        <div className="capabilities" aria-label="Provider status">
-          <span className={`chip ${status.ai.configured ? "ok" : "warn"}`}>
-            AI: {status.ai.configured ? status.ai.provider : "not configured"}
-            {status.ai.configured && status.ai.model
-              ? ` · ${status.ai.model}`
-              : ""}
-          </span>
-          <span className={`chip ${status.search.configured ? "ok" : "muted"}`}>
-            Research: {status.search.configured ? status.search.provider : "not configured"}
-          </span>
-          <span className={`chip ${status.images.configured ? "ok" : "muted"}`}>
-            Images: {status.images.configured ? "ready" : "not configured"}
-          </span>
-          <span className={`chip ${status.voice.configured ? "ok" : "muted"}`}>
-            Voice: {status.voice.configured ? "ready" : "not configured"}
-          </span>
-          <span className={`chip ${status.email?.configured ? "ok" : "muted"}`}>
-            Email: {status.email?.configured ? "ready" : "not configured"}
-          </span>
-          {status.signedIn ? (
-            <span className="chip ok">Memory: on</span>
-          ) : (
-            <span className="chip muted">Memory: sign in</span>
-          )}
-        </div>
-      )}
+      <a className="skip-link" href="#conversation">
+        Skip to the conversation
+      </a>
 
-      <section className="chat" aria-live="polite">
-        {messages.map((message, index) => (
-          <article
-            key={index}
-            className={`message ${message.role}${message.kind === "error" ? " error" : ""}`}
+      <main className="workspace">
+        <header className="topbar">
+          <button
+            type="button"
+            className="icon-btn only-mobile"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={mobileOpen}
           >
-            <div className="label">
-              {message.role === "assistant" ? "BDM" : "You"}
-              {message.kind === "research" && <span className="label-tag">research</span>}
-            </div>
-            <div className="message-text">{message.content}</div>
+            <Icon name="menu" size={19} />
+          </button>
 
-            {message.memoryAction && (
-              <div
-                className={`memory-badge ${memoryBadge(message.memoryAction).tone}`}
-                role="status"
-              >
-                {memoryBadge(message.memoryAction).text}
-                {message.memoryAction.type === "saved" &&
-                  message.memoryAction.memory?.content && (
-                    <span className="memory-badge-detail">
-                      {message.memoryAction.memory.content}
-                    </span>
-                  )}
-              </div>
-            )}
+          <div className="topbar-title">
+            <span className="topbar-name">{topbarTitle}</span>
+            <span className="topbar-sub">{topbarSub}</span>
+          </div>
 
-            {message.image && (
-              <figure className="image-result">
-                {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
-                <img src={message.image.dataUrl} alt={message.content} />
-                <figcaption>
-                  <a
-                    className="auth-btn"
-                    href={message.image.dataUrl}
-                    download={`bdm-image-${message.image.createdAt.replace(/[:.]/g, "-")}.png`}
+          <div className="topbar-actions">
+            <Link
+              href="/settings"
+              className="icon-btn"
+              title="Settings and diagnostics"
+              aria-label="Settings and diagnostics"
+            >
+              <Icon name="settings" size={18} />
+            </Link>
+
+            {!signedIn && authChecked ? (
+              <Link className="btn ghost" href="/auth">
+                <GoogleIcon size={15} />
+                Sign in
+              </Link>
+            ) : null}
+          </div>
+        </header>
+
+        {view === "research" ? (
+          <div className="chat-scroll" id="conversation">
+            <ResearchView
+              configured={researchReady}
+              signedIn={signedIn}
+              conversationId={conversationId}
+              onConversationChange={setConversationId}
+              onResearchComplete={() => {
+                void loadConversations();
+              }}
+            />
+          </div>
+        ) : (
+          <div className="chat-scroll" id="conversation" ref={feedRef}>
+            <div className="chat-inner">
+              {emptyChat ? (
+                <Welcome
+                  greeting={greetingFor()}
+                  name={displayName}
+                  researchReady={researchReady}
+                  onChat={(seed) => {
+                    setResearchMode(false);
+                    setInput(seed);
+                    requestAnimationFrame(() => inputRef.current?.focus());
+                  }}
+                  onResearch={() => focusResearch()}
+                />
+              ) : (
+                messages.map((message, index) => (
+                  <article
+                    key={index}
+                    className={`msg ${message.role === "user" ? "msg-user" : "msg-assistant"}${
+                      message.kind === "error" ? " msg-error" : ""
+                    }`}
                   >
-                    Download
-                  </a>
-                  <span className="hint">
-                    {" "}
-                    {message.image.model} · {message.image.size} · {message.image.quality}
-                  </span>
-                </figcaption>
-              </figure>
-            )}
-
-            {message.sources && message.sources.length > 0 && (
-              <div className="sources">
-                <div className="sources-title">Sources</div>
-                <ol>
-                  {message.sources.map((source) => (
-                    <li key={`${source.index}-${source.url}`} value={source.index}>
-                      <a href={source.url} target="_blank" rel="noopener noreferrer nofollow">
-                        {source.title}
-                      </a>
-                      <span className="source-meta">
-                        {source.domain}
-                        {source.publishedDate ? ` · ${source.publishedDate}` : ""}
+                    <div className="msg-avatar" aria-hidden="true">
+                      <span className="avatar avatar-sm">
+                        {message.role === "assistant" ? "B" : accountInitial}
                       </span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
+                    </div>
+                    <div className="msg-body">
+                      <div className="msg-head">
+                        <span className="msg-author">
+                          {message.role === "assistant" ? "BDM" : "You"}
+                        </span>
+                        {message.kind === "research" ? (
+                          <span className="label-tag">research</span>
+                        ) : null}
+                        {message.kind === "image" ? (
+                          <span className="label-tag">image</span>
+                        ) : null}
+                      </div>
 
-            {message.warning && <p className="notice warn">{message.warning}</p>}
+                      <div className="msg-content">
+                        {message.kind === "error" ? (
+                          <p className="msg-error-text">{message.content}</p>
+                        ) : (
+                          <Markdown
+                            content={message.content}
+                            sources={message.sources}
+                          />
+                        )}
+                      </div>
 
-            {message.memoriesUsed && message.memoriesUsed.length > 0 && (
-              <details className="used-memories">
-                <summary>
-                  Used {message.memoriesUsed.length}{" "}
-                  {message.memoriesUsed.length === 1 ? "memory" : "memories"}
-                </summary>
-                <ul>
-                  {message.memoriesUsed.map((memory) => (
-                    <li key={memory.id}>
-                      <span className="badge">{memory.kind}</span> {memory.content}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </article>
-        ))}
-        {busy && (
-          <article className="message assistant">
-            <div className="label">BDM</div>
-            <div className="message-text">
-              {researchMode ? "Researching the web…" : "Thinking…"}
+                      {message.retryText ? (
+                        <div className="msg-actions">
+                          <button
+                            type="button"
+                            className="msg-retry"
+                            onClick={() => retry(message)}
+                            disabled={busy}
+                          >
+                            <Icon name="retry" size={14} />
+                            Try again
+                          </button>
+                        </div>
+                      ) : null}
+
+                      {message.memoryAction ? (
+                        <div
+                          className={`memory-badge ${
+                            memoryBadge(message.memoryAction).tone
+                          }`}
+                          role="status"
+                        >
+                          {memoryBadge(message.memoryAction).text}
+                          {message.memoryAction.type === "saved" &&
+                          message.memoryAction.memory?.content ? (
+                            <span className="memory-badge-detail">
+                              {message.memoryAction.memory.content}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {message.image ? (
+                        <figure className="image-result">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
+                          <img
+                            src={message.image.dataUrl}
+                            alt={message.content}
+                          />
+                          <figcaption>
+                            <a
+                              className="btn ghost"
+                              href={message.image.dataUrl}
+                              download={`bdm-image-${message.image.createdAt.replace(
+                                /[:.]/g,
+                                "-"
+                              )}.png`}
+                            >
+                              Download
+                            </a>
+                            <span className="hint">
+                              {message.image.model} · {message.image.size} ·{" "}
+                              {message.image.quality}
+                            </span>
+                          </figcaption>
+                        </figure>
+                      ) : null}
+
+                      {message.sources && message.sources.length > 0
+                        ? messageSources(message.sources)
+                        : null}
+
+                      {message.warning ? (
+                        <p className="notice warn">{message.warning}</p>
+                      ) : null}
+
+                      {message.memoriesUsed && message.memoriesUsed.length > 0 ? (
+                        <details className="used-memories">
+                          <summary>
+                            Used {message.memoriesUsed.length}{" "}
+                            {message.memoriesUsed.length === 1
+                              ? "memory"
+                              : "memories"}
+                          </summary>
+                          <ul>
+                            {message.memoriesUsed.map((memory) => (
+                              <li key={memory.id}>
+                                <span className="badge">{memory.kind}</span>{" "}
+                                {memory.content}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  </article>
+                ))
+              )}
+
+              {busy ? (
+                <article className="msg msg-assistant">
+                  <div className="msg-avatar" aria-hidden="true">
+                    <span className="avatar avatar-sm">B</span>
+                  </div>
+                  <div className="msg-body">
+                    <div className="msg-head">
+                      <span className="msg-author">BDM</span>
+                      <span className="label-tag">
+                        {researchMode ? "searching" : "thinking"}
+                      </span>
+                    </div>
+                    <p className="typing" aria-live="polite">
+                      <span className="typing-dots" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                      {researchMode
+                        ? "Searching the web and reading the results…"
+                        : "Thinking…"}
+                    </p>
+                  </div>
+                </article>
+              ) : null}
             </div>
-          </article>
+          </div>
         )}
-      </section>
 
-      <form className="composer" onSubmit={submit}>
-        <div className="composer-tools">
-          <button
-            type="button"
-            className={`tool ${researchMode ? "active" : ""}`}
-            aria-pressed={researchMode}
-            onClick={() => setResearchMode((value) => !value)}
-            title={
-              researchReady
-                ? "Answer with web research and citations"
-                : "Web research is not configured on the server"
-            }
-          >
-            {researchMode ? "Research on" : "Research"}
-          </button>
-          <button
-            type="button"
-            className="tool"
-            onClick={() => setShowImage(true)}
-            aria-haspopup="dialog"
-          >
-            Image
-          </button>
-          <button
-            type="button"
-            className="tool"
-            onClick={() => setShowVoice(true)}
-            aria-haspopup="dialog"
-          >
-            Voice
-          </button>
-          <button
-            type="button"
-            className="tool"
-            onClick={() => setShowEmail(true)}
-            aria-haspopup="dialog"
-            disabled={!user}
-            title={user ? "Compose and send an email" : "Sign in to send email"}
-          >
-            Email
-          </button>
-          {researchMode && !researchReady && (
-            <span className="tool-hint">
-              Research is not configured, so requests will report that instead of guessing.
-            </span>
-          )}
-          {researchMode && researchReady && (
-            <span className="tool-hint">Only your question is sent to the search provider.</span>
-          )}
-        </div>
-        <div className="composer-row">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-            placeholder={
-              researchMode ? "Ask a question BDM should research…" : "Ask BDM anything…"
-            }
-            aria-label="Message BDM"
-            rows={2}
-          />
-          <button type="submit" disabled={busy || !input.trim()}>
-            Send
-          </button>
-        </div>
-      </form>
+        {view === "chat" ? (
+          <div className="composer">
+            <form className="composer-inner" onSubmit={submit}>
+              <div className="composer-tools">
+                <button
+                  type="button"
+                  className={`tool${researchMode ? " active" : ""}`}
+                  onClick={() => setResearchMode((value) => !value)}
+                  aria-pressed={researchMode}
+                  title="Search the live web and answer with citations"
+                >
+                  <Icon name="globe" size={15} />
+                  Research
+                </button>
+                <button
+                  type="button"
+                  className="tool"
+                  onClick={() => setShowVoice(true)}
+                  disabled={!signedIn}
+                  title={
+                    signedIn
+                      ? "Record a voice note"
+                      : "Sign in to use voice notes"
+                  }
+                >
+                  <Icon name="mic" size={15} />
+                  Voice note
+                </button>
+                <button
+                  type="button"
+                  className="tool"
+                  onClick={() => setShowImage(true)}
+                  disabled={!imageReady}
+                  title={
+                    imageReady
+                      ? "Generate an image"
+                      : "Image generation is not configured"
+                  }
+                >
+                  <Icon name="image" size={15} />
+                  Image
+                </button>
+                <button
+                  type="button"
+                  className="tool"
+                  onClick={() => setShowEmail(true)}
+                  disabled={!signedIn || !emailReady}
+                  title={
+                    emailReady && signedIn
+                      ? "Draft an email"
+                      : "Email sending is not available"
+                  }
+                >
+                  <Icon name="mail" size={15} />
+                  Email
+                </button>
+                <span className="tool-hint">
+                  {busy
+                    ? "Stop cancels this request"
+                    : researchMode && !researchReady
+                      ? "Research needs a search provider key"
+                      : "Enter sends · Shift+Enter for a new line"}
+                </span>
+              </div>
+
+              <div className="composer-box">
+                <textarea
+                  id="composer-input"
+                  ref={inputRef}
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.shiftKey &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                  placeholder={
+                    researchMode
+                      ? "Ask a research question…"
+                      : "Message BDM…"
+                  }
+                  aria-label={researchMode ? "Research question" : "Message BDM"}
+                  rows={1}
+                />
+                {busy ? (
+                  <button
+                    type="button"
+                    className="send-btn send-stop"
+                    onClick={stopGenerating}
+                    aria-label="Stop generating"
+                    title="Stop generating"
+                  >
+                    <Icon name="stop" size={17} />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="send-btn"
+                    disabled={!input.trim()}
+                    aria-label="Send message"
+                    title="Send message"
+                  >
+                    <Icon name="send" size={17} />
+                  </button>
+                )}
+              </div>
+
+              <p className="composer-hint">
+                Private by default. Voice notes are transcribed and discarded,
+                and research shows the sources behind every claim.
+              </p>
+            </form>
+          </div>
+        ) : null}
+      </main>
+
+
+
 
       <MemoryPanel
         open={showMemory}
         onClose={() => setShowMemory(false)}
-        onHistoryCleared={clearHistory}
+        onHistoryCleared={newChat}
       />
 
-      {showImage && (
-        <div
-          className="modal-backdrop"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setShowImage(false);
+      <Modal open={showImage} onClose={() => setShowImage(false)}>
+        <ImagePanel
+          configured={imageReady}
+          onGenerated={(image: GeneratedImage, prompt: string) => {
+            setView("chat");
+            setMessages((current) => [
+              ...current,
+              {
+                role: "assistant",
+                content: `Generated image: ${prompt}`,
+                kind: "image",
+                image
+              }
+            ]);
           }}
-        >
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Generate an image">
-            <ImagePanel
-              configured={imageReady}
-              onGenerated={(image, prompt) => {
-                setMessages((current) => [
-                  ...current,
-                  {
-                    role: "assistant",
-                    content: `Generated image: ${prompt}`,
-                    kind: "image",
-                    image
-                  }
-                ]);
-              }}
-              onClose={() => setShowImage(false)}
-            />
-          </div>
-        </div>
-      )}
+          onClose={() => setShowImage(false)}
+        />
+      </Modal>
 
-      {showVoice && (
-        <div className="modal-backdrop">
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Voice note">
-            <VoiceRecorder
-              configured={voiceReady}
-              maxSeconds={status?.voice.maxDurationSeconds ?? 300}
-              onUseTranscript={useTranscript}
-              onClose={() => setShowVoice(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showVoice}
+        onClose={() => setShowVoice(false)}
+        title="Voice note"
+      >
+        <VoiceRecorder
+          configured={voiceReady}
+          signedIn={signedIn}
+          maxSeconds={status?.voice.maxDurationSeconds ?? 300}
+          onUseTranscript={useTranscript}
+          onClose={() => setShowVoice(false)}
+        />
+      </Modal>
 
-      {showEmail && (
-        <div
-          className="modal-backdrop"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setShowEmail(false);
-          }}
-        >
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Send an email">
-            <EmailPanel
-              configured={status?.email?.configured ?? false}
-              onClose={() => setShowEmail(false)}
-            />
+      <Modal
+        open={showEmail}
+        onClose={() => setShowEmail(false)}
+        title="Send an email"
+      >
+        <EmailPanel configured={emailReady} onClose={() => setShowEmail(false)} />
+      </Modal>
+
+      <Modal open={showHelp} onClose={() => setShowHelp(false)} title="Help">
+        <div className="panel">
+          <p className="hint">
+            BDM keeps your data in your own Supabase account. Provider keys
+            stay on the server, recordings are never stored, and research sends
+            only the question you type.
+          </p>
+          <div className="panel-actions">
+            <Link className="btn ghost" href="/settings">
+              <Icon name="settings" size={15} />
+              Account and provider status
+            </Link>
+            <Link className="btn ghost" href="/brand">
+              <Icon name="sparkle" size={15} />
+              Brand assets
+            </Link>
+            <a className="btn ghost" href="/api/health" target="_blank">
+              <Icon name="external" size={15} />
+              Health check
+            </a>
           </div>
         </div>
-      )}
-    </main>
+      </Modal>
+    </div>
+  );
+}
+
+function memoryBadge(action: MessageMemoryAction): { text: string; tone: string } {
+  switch (action.type) {
+    case "saved":
+      return { text: `Saved to memory (${action.memory?.kind ?? "fact"})`, tone: "ok" };
+    case "forgotten":
+      return {
+        text:
+          action.count === 1
+            ? "Forgot 1 memory"
+            : `Forgot ${action.count ?? 0} memories`,
+        tone: "ok"
+      };
+    case "blocked_secret":
+      return { text: "Not saved — looks like a secret", tone: "warn" };
+    case "unavailable":
+      return { text: "Memory unavailable — nothing saved", tone: "warn" };
+    case "not_found":
+      return { text: "No matching memory found", tone: "warn" };
+    default:
+      return { text: "Memory action", tone: "" };
+  }
+}
+
+function messageSources(sources: Source[]) {
+  return (
+    <div className="sources">
+      <div className="sources-title">Sources</div>
+      <ol>
+        {sources.map((source) => (
+          <li key={`${source.index}-${source.url}`}>
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              title={source.snippet || source.title}
+            >
+              {source.title}
+              <span className="source-meta">
+                {source.domain}
+                {source.publishedDate ? ` · ${source.publishedDate}` : ""}
+              </span>
+            </a>
+            {source.snippet ? (
+              <p className="source-snippet">{source.snippet}</p>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
