@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./styles.css";
+import SWRegister from "./components/SWRegister";
 
 export const metadata: Metadata = {
   title: "BDM — Personal AI",
@@ -29,7 +30,10 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#07090d" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <SWRegister />
+      </body>
     </html>
   );
 }

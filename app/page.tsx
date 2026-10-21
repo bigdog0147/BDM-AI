@@ -28,11 +28,7 @@ import type {
   MessageMemoryAction,
   Source
 } from "./components/types";
-import {
-  displayNameFromEmail,
-  formatRelativeTime,
-  greetingFor
-} from "../lib/workspace";
+import { displayNameFromEmail, greetingFor } from "../lib/workspace";
 
 
 type ChatMessage = {
@@ -344,6 +340,17 @@ export default function Home() {
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
+  // Deep link for the installed app: `/?view=research` opens the workspace
+  // with Research already armed. The query is read in an effect rather than
+  // through `useSearchParams`, so the page can stay statically prerendered.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("view");
+    if (requested === "research") {
+      setResearchMode(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, []);
+
   // Keep the newest turn in view without stealing focus.
   useEffect(() => {
     if (!messages.length) return;
@@ -419,6 +426,10 @@ export default function Home() {
         onSignOut={() => void signOut()}
       />
 
+      <a className="skip-link" href="#conversation">
+        Skip to the conversation
+      </a>
+
       <main className="workspace">
         <header className="topbar">
           <button
@@ -456,7 +467,7 @@ export default function Home() {
         </header>
 
         {view === "research" ? (
-          <div className="chat-scroll">
+          <div className="chat-scroll" id="conversation">
             <ResearchView
               configured={researchReady}
               signedIn={signedIn}
@@ -468,7 +479,7 @@ export default function Home() {
             />
           </div>
         ) : (
-          <div className="chat-scroll" ref={feedRef}>
+          <div className="chat-scroll" id="conversation" ref={feedRef}>
             <div className="chat-inner">
               {emptyChat ? (
                 <Welcome

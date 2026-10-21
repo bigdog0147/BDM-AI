@@ -11,7 +11,7 @@
 
 /* ----------------------------------------------------------------- app grid */
 
-.app {
+.app.app {
   display: grid;
   grid-template-columns: 272px minmax(0, 1fr);
   height: 100vh;
@@ -968,8 +968,8 @@
 }
 
 @media (max-width: 1024px) {
-  .app,
-  .app.sidebar-collapsed {
+  .app.app,
+  .app.app.sidebar-collapsed {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1080,206 +1080,6 @@
   }
 }
 
-/* =============================================================================
-   Status rail (ported design)
-   ========================================================================== */
-
-.rail {
-  border-left: 1px solid var(--bdm-line-soft);
-  background: linear-gradient(180deg, rgba(6, 14, 32, 0.8), rgba(4, 9, 22, 0.92));
-  padding: 18px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-  min-width: 0;
-}
-
-.rail-card {
-  border: 1px solid var(--bdm-line-soft);
-  border-radius: var(--bdm-radius-lg);
-  background: linear-gradient(165deg, rgba(11, 27, 58, 0.72), rgba(6, 14, 32, 0.6));
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.rail-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.rail-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 700;
-}
-
-.rail-title svg {
-  color: var(--bdm-gold);
-}
-
-.rail-link {
-  border: 0;
-  background: transparent;
-  color: var(--bdm-electric);
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 6px;
-}
-
-.rail-link:hover {
-  text-decoration: underline;
-}
-
-.rail-actions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rail-action {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--bdm-line-soft);
-  background: rgba(21, 94, 239, 0.12);
-  color: var(--bdm-text);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--bdm-fast), transform var(--bdm-fast);
-}
-
-.rail-action:hover:not(:disabled) {
-  background: rgba(21, 94, 239, 0.24);
-  transform: translateX(2px);
-}
-
-.rail-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.rail-action-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  border: 1px solid var(--bdm-line-strong);
-  background: rgba(21, 94, 239, 0.16);
-  color: var(--bdm-electric);
-}
-
-.rail-action-icon.gold {
-  border-color: var(--bdm-line);
-  background: rgba(245, 196, 81, 0.12);
-  color: var(--bdm-gold);
-}
-
-.rail-action span:last-child {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.rail-action strong {
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.rail-action small {
-  font-size: 11.5px;
-  color: var(--bdm-muted);
-}
-
-.rail-chats {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.rail-chat {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 8px 9px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--bdm-muted);
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--bdm-fast), color var(--bdm-fast);
-}
-
-.rail-chat:hover {
-  background: rgba(168, 185, 214, 0.08);
-  color: var(--bdm-text);
-}
-
-.rail-chat.active {
-  background: rgba(21, 94, 239, 0.16);
-  color: var(--bdm-text);
-}
-
-.rail-chat-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rail-chat-time {
-  font-size: 11px;
-  color: var(--bdm-faint);
-  flex: 0 0 auto;
-}
-
-.rail-empty {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--bdm-faint);
-  line-height: 1.5;
-}
-
-.rail-health {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--bdm-warning);
-}
-
-.rail-health.ok {
-  color: var(--bdm-success);
-}
-
 .status-dot {
   width: 8px;
   height: 8px;
@@ -1287,56 +1087,4 @@
   background: var(--bdm-warning);
   box-shadow: 0 0 10px rgba(255, 213, 154, 0.5);
   flex: 0 0 auto;
-}
-
-.rail-health.ok .status-dot {
-  background: var(--bdm-success);
-  box-shadow: 0 0 10px rgba(98, 230, 167, 0.55);
-}
-
-.rail-services {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.rail-services li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-}
-
-.rail-service-name {
-  color: var(--bdm-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 10px;
-}
-
-.rail-service-detail {
-  color: var(--bdm-text);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-.rail-note {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--bdm-faint);
-}
-
-@media (max-width: 1280px) {
-  .app {
-    grid-template-columns: 272px minmax(0, 1fr);
-  }
-
-  .rail {
-    display: none;
-  }
 }

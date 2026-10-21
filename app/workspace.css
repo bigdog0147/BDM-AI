@@ -208,7 +208,7 @@ button:disabled {
 
 .app {
   display: grid;
-  grid-template-columns: 276px minmax(0, 1fr) 320px;
+  
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -1129,118 +1129,6 @@ button:disabled {
   color: var(--bdm-faint);
 }
 
-/* --------------------------------------------------------------------- rail */
-
-.rail {
-  border-left: 1px solid var(--bdm-line-soft);
-  background: linear-gradient(180deg, rgba(8, 21, 47, 0.7), rgba(5, 11, 28, 0.86));
-  padding: 20px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-}
-
-.rail-card {
-  border: 1px solid var(--bdm-line-soft);
-  border-radius: var(--bdm-radius);
-  background: rgba(8, 21, 47, 0.6);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.rail-title {
-  margin: 0;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--bdm-faint);
-}
-
-.rail-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.rail-action,
-.rail-link {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  border: 1px solid transparent;
-  border-radius: var(--bdm-radius-sm);
-  background: transparent;
-  color: var(--bdm-muted);
-  padding: 8px 9px;
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--bdm-fast), color var(--bdm-fast);
-}
-
-.rail-action:hover,
-.rail-link:hover {
-  background: rgba(21, 94, 239, 0.14);
-  color: var(--bdm-text);
-}
-
-.rail-link {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.rail-empty {
-  margin: 0;
-  font-size: 12px;
-  color: var(--bdm-faint);
-}
-
-.rail-status {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.rail-status li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-}
-
-.rail-status-label {
-  color: var(--bdm-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 10px;
-}
-
-.rail-status-value {
-  color: var(--bdm-text);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-.rail-note {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--bdm-faint);
-}
-
 /* =============================================================================
    Modals, drawers and panels
    ========================================================================== */
@@ -2097,19 +1985,11 @@ select:focus,
 }
 
 @media (max-width: 1280px) {
-  .app {
-    grid-template-columns: 264px minmax(0, 1fr);
-  }
-
-  .rail {
-    display: none;
-  }
+  .app { }
 }
 
 @media (max-width: 1024px) {
-  .app {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  .app { }
 
   .only-mobile {
     display: inline-flex;
