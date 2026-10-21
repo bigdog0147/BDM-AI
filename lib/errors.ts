@@ -56,6 +56,9 @@ export function safeError(message: string): string {
   if (message.includes("openai unauthorized")) {
     return "OpenAI rejected the configured credentials.";
   }
+  if (message.includes("openai out of credit")) {
+    return "The OpenAI account has no credit left. Add credit at platform.openai.com/settings/organization/billing/ - replies, images and voice notes fail until then.";
+  }
   if (message.includes("openai rate limited")) {
     return "OpenAI is rate limiting requests. Try again shortly.";
   }

@@ -63,17 +63,19 @@ function mockOllama(
   init?: { ok?: boolean; status?: number }
 ) {
   const fn = vi.fn(
-    async (
-      _url: string | URL | Request,
-      _init?: RequestInit
-    ): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> => ({
+    async (_url: string | URL | Request, _init?: RequestInit): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> => ({
       ok: init?.ok ?? true,
       status: init?.status ?? 200,
       json: async () => body
     })
   );
   vi.stubGlobal("fetch", fn);
-  return fn;
+  // Cast to get proper mock.calls typing
+  return fn as ReturnType<typeof vi.fn> & {
+    mock: {
+      calls: Array<[string | URL | Request, RequestInit?]>;
+    };
+  };
 }
 
 async function post(body: unknown, headers: Record<string, string> = {}) {

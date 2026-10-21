@@ -1,257 +1,317 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Icon, GoogleIcon } from "../components/Icons";
+import BrandLogo from "../components/BrandLogo";
 
-/**
- * Sign-in / sign-up page. Talks to the /api/auth/* routes which use the
- * server-side Supabase SSR client; on success the auth cookie is set and we
- * return to the chat.
- */
+type Mode = "signin" | "signup" | "forgot";
+
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_not_configured:
+    "Google sign-in is not configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server.",
+  google_store_not_configured:
+    "The Google identity guard is unavailable. Add SUPABASE_SERVICE_ROLE_KEY and apply the 0004 Google identities migration.",
+  google_account_exists:
+    "An account with that email already exists. Sign in with your password first, then connect Google from Settings. BDM never links by email alone.",
+  google_email_mismatch:
+    "The verified Google email must match the email on your signed-in BDM account.",
+  google_already_linked:
+    "That Google account is already connected to another BDM account.",
+  google_cancelled: "Google sign-in was cancelled before it completed.",
+  google_denied: "Google did not grant access.",
+  google_state:
+    "The sign-in attempt expired or could not be verified. Please try again.",
+  google_token_exchange: "Google did not complete the token exchange. Please try again.",
+  google_token_invalid: "Google's identity token could not be verified.",
+  google_email_unverified: "Google did not confirm this email as verified.",
+  google_nonce: "The sign-in attempt could not be verified. Please try again.",
+  google_sign_in_failed:
+    "Google verified you, but Supabase could not create the session. Confirm the Google provider is enabled in Supabase Auth.",
+  google_account_mismatch:
+    "The Google account did not match the expected BDM account. No session was created.",
+  google_link_failed: "The Google account could not be linked. Nothing was changed.",
+  google_account_failed:
+    "The BDM account could not be created. No session was created.",
+  google_sign_in_required: "Sign in to BDM first, then connect Google from Settings.",
+  auth_not_configured: "Supabase Auth is not configured on this server.",
+  google_redirect_uri:
+    "The Google redirect URI is invalid. Use HTTPS, or localhost during development."
+};
+
+const TABS = [
+  { key: "signin" as Mode, label: "Sign in", description: "Welcome back" },
+  { key: "signup" as Mode, label: "Sign up", description: "Create an account" }
+] as const;
+
 export default function AuthPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  async function requestEmail(kind: "resend-verification" | "password-reset") {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlError = params.get("error");
+    const urlNotice = params.get("notice");
+    const urlMode = params.get("mode");
+
+    if (urlError) {
+      setTimeout(
+        () => setError(GOOGLE_ERRORS[urlError] ?? "Authentication could not complete."),
+        0
+      );
+    }
+    if (urlNotice) {
+      setTimeout(() => setNotice(urlNotice), 0);
+    }
+    if (urlMode === "forgot") {
+      setTimeout(() => setMode("forgot"), 0);
+    }
+  }, []);
+
+  function switchMode(next: Mode) {
+    setMode(next);
     setError(null);
     setNotice(null);
-    if (!email.trim()) {
-      setError("Enter your email address first.");
+    setEmail("");
+    setPassword("");
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setNotice(null);
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
+      setError("A valid email is required.");
       return;
     }
+
+    if (mode !== "forgot" && password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
     setBusy(true);
+
     try {
-      const res = await fetch(`/api/auth/${kind}`, {
+      let endpoint = `/api/auth/${mode === "signup" ? "signup" : "signin"}`;
+      let body = JSON.stringify({ email: trimmedEmail, password });
+
+      if (mode === "forgot") {
+        endpoint = "/api/auth/resend-verification";
+        body = JSON.stringify({ email: trimmedEmail });
+      }
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: email.trim() })
+        body
       });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "Something went wrong");
-        return;
+
+      const data = (await response.json()) as { error?: string; ok?: boolean };
+
+      if (!response.ok) {
+        throw new Error(data.error || "Authentication failed.");
       }
-      setNotice(
-        kind === "password-reset"
-          ? "If that address has an account, a password reset email is on its way."
-          : "If that address needs confirmation, a new verification email is on its way."
-      );
-    } catch {
-      setError("Network error. Please try again.");
+
+      if (mode === "forgot") {
+        setNotice(
+          "If an account exists for that email, a verification link has been sent."
+        );
+        setEmail("");
+      } else if (mode === "signup") {
+        setNotice(
+          "Account created. Check your email for the confirmation link, then sign in."
+        );
+        setMode("signin");
+        setEmail("");
+        setPassword("");
+      } else {
+        router.push("/");
+        router.refresh();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setNotice(null);
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/auth/${mode}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      const data = (await res.json()) as { error?: string; needsConfirmation?: boolean };
-      if (!res.ok) {
-        setError(data.error ?? "Something went wrong");
-        return;
-      }
-      if (mode === "signup" && data.needsConfirmation) {
-        setNotice("Account created. Check your email to confirm, then sign in.");
-        setMode("signin");
-        return;
-      }
-      router.push("/");
-      router.refresh();
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const currentTab = TABS.find((t) => t.key === mode) ?? TABS[0];
 
   return (
-    <main style={styles.main}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>BDM</h1>
-        <p style={styles.subtitle}>
-          {mode === "signin" ? "Sign in to your assistant" : "Create your account"}
+    <main className="auth-page">
+      <section className="auth-showcase" aria-label="About BDM">
+        <BrandLogo variant="mark" size={44} decorative />
+        <h1 className="auth-showcase-title">
+          Your personal AI, working from one quiet workspace.
+        </h1>
+        <p className="auth-showcase-text">
+          Chat with BDM, speak a note and have it transcribed, or send a
+          question to the live web and get an answer with the sources attached.
+          Everything is scoped to your own account.
         </p>
+        <ul className="auth-points">
+          <li>
+            <Icon name="shield" size={15} />
+            Server-verified Google sign-in. BDM never links an account by
+            email alone.
+          </li>
+          <li>
+            <Icon name="mic" size={15} />
+            Voice notes are transcribed and then discarded. Nothing is kept.
+          </li>
+          <li>
+            <Icon name="globe" size={15} />
+            Research answers carry the sources behind every claim.
+          </li>
+        </ul>
+      </section>
 
-        <div style={styles.tabs}>
-          <button
-            type="button"
-            onClick={() => setMode("signin")}
-            style={{ ...styles.tab, ...(mode === "signin" ? styles.tabActive : {}) }}
+      <div className="auth-card">
+        <header className="auth-card-head">
+          <span className="auth-logo">
+            <BrandLogo variant="mark" size={34} decorative />
+          </span>
+          <h1 className="auth-title">{currentTab.label}</h1>
+          <p className="auth-sub">{currentTab.description}</p>
+        </header>
+
+        {mode !== "forgot" ? (
+          <div className="auth-tabs" role="tablist" aria-label="Authentication mode">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={mode === tab.key}
+                className={`auth-tab${mode === tab.key ? " active" : ""}`}
+                onClick={() => switchMode(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {notice && (
+          <div className="notice ok" role="status">
+            {notice}
+          </div>
+        )}
+
+        {error && (
+          <div className="notice error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <div className="google-form">
+          <a
+            className={`google-btn${busy ? " disabled" : ""}`}
+            href="/api/auth/google/start"
+            aria-disabled={busy}
           >
-            Sign in
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("signup")}
-            style={{ ...styles.tab, ...(mode === "signup" ? styles.tabActive : {}) }}
-          >
-            Sign up
-          </button>
+            <GoogleIcon size={18} />
+            Continue with Google
+          </a>
+          <p className="hint google-hint">
+            Google verifies your email on the server before BDM creates an
+            account.
+          </p>
         </div>
 
-        <form onSubmit={submit} style={styles.form}>
-          <label style={styles.label}>
-            Email
+        <div className="auth-divider">
+          <span>or use email and password</span>
+        </div>
+
+        <form className="auth-form" onSubmit={submit}>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="email">
+              Email
+            </label>
             <input
+              id="email"
+              className="auth-input"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
               autoComplete="email"
-              style={styles.input}
-            />
-          </label>
-          <label style={styles.label}>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              disabled={busy}
               required
-              minLength={mode === "signup" ? 8 : undefined}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              style={styles.input}
             />
-          </label>
+          </div>
 
-          {error && <div style={styles.error}>{error}</div>}
-          {notice && <div style={styles.notice}>{notice}</div>}
+          {mode !== "forgot" && (
+            <div className="auth-field">
+              <div className="auth-password-row">
+                <label className="auth-label" htmlFor="password">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  className="auth-link"
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              <input
+                id="password"
+                className="auth-input"
+                type={showPassword ? "text" : "password"}
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={
+                  mode === "signin" ? "Your password" : "At least 8 characters"
+                }
+                disabled={busy}
+                required
+              />
+            </div>
+          )}
 
-          <button type="submit" disabled={busy} style={styles.submit}>
-            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+          <button type="submit" className="btn primary auth-submit" disabled={busy}>
+            {busy
+              ? "Please wait…"
+              : mode === "forgot"
+                ? "Send email"
+                : currentTab.label}
           </button>
         </form>
 
-        <div style={styles.links}>
-          {mode === "signin" && (
+        <div className="auth-links">
+          {mode !== "forgot" && (
             <button
               type="button"
-              style={styles.link}
-              disabled={busy}
-              onClick={() => void requestEmail("password-reset")}
+              className="auth-link"
+              onClick={() => switchMode("forgot")}
             >
-              Forgot password?
+              {mode === "signin"
+                ? "Forgot password?"
+                : "Didn't receive the verification email?"}
             </button>
           )}
-          {mode === "signin" && (
+          {mode === "forgot" && (
             <button
               type="button"
-              style={styles.link}
-              disabled={busy}
-              onClick={() => void requestEmail("resend-verification")}
+              className="auth-link"
+              onClick={() => switchMode("signin")}
             >
-              Resend verification email
+              Back to sign in
             </button>
           )}
-          <Link style={styles.link} href="/">
-            Back to chat
-          </Link>
         </div>
       </div>
     </main>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#0b0d12",
-    color: "#e6e8ee",
-    fontFamily: "system-ui, sans-serif",
-    padding: 24
-  },
-  card: {
-    width: "100%",
-    maxWidth: 380,
-    background: "#14171f",
-    border: "1px solid #262b36",
-    borderRadius: 14,
-    padding: 28
-  },
-  title: { margin: 0, fontSize: 28, letterSpacing: 1 },
-  subtitle: { margin: "6px 0 20px", color: "#9aa3b2", fontSize: 14 },
-  tabs: { display: "flex", gap: 8, marginBottom: 18 },
-  tab: {
-    flex: 1,
-    padding: "8px 0",
-    background: "transparent",
-    color: "#9aa3b2",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "#2a303c",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontSize: 14
-  },
-  tabActive: { background: "#1d2330", color: "#e6e8ee", borderColor: "#3a4252" },
-  form: { display: "flex", flexDirection: "column", gap: 14 },
-  label: { display: "flex", flexDirection: "column", gap: 6, fontSize: 13, color: "#9aa3b2" },
-  input: {
-    padding: "10px 12px",
-    background: "#0e1117",
-    border: "1px solid #2a303c",
-    borderRadius: 8,
-    color: "#e6e8ee",
-    fontSize: 14
-  },
-  error: {
-    background: "#3a1d1d",
-    border: "1px solid #6b2b2b",
-    color: "#ffb4b4",
-    padding: "8px 10px",
-    borderRadius: 8,
-    fontSize: 13
-  },
-  notice: {
-    background: "#1d3a2a",
-    border: "1px solid #2b6b45",
-    color: "#b4ffcf",
-    padding: "8px 10px",
-    borderRadius: 8,
-    fontSize: 13
-  },
-  submit: {
-    marginTop: 6,
-    padding: "11px 0",
-    background: "#3b6cff",
-    color: "white",
-    border: "none",
-    borderRadius: 8,
-    fontSize: 15,
-    cursor: "pointer"
-  },
-  links: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 14,
-    marginTop: 16,
-    justifyContent: "center"
-  },
-  link: {
-    background: "none",
-    border: "none",
-    padding: 0,
-    color: "#9aa3b2",
-    fontSize: 13,
-    textDecoration: "underline",
-    cursor: "pointer"
-  }
-};

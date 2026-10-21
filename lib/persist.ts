@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "./supabase-server";
+import { generateReply } from "./ai";
 
 interface PersistArgs {
   userMessage: string;
@@ -11,6 +12,26 @@ interface PersistArgs {
    * `content` column, so no schema change is needed.
    */
   assistantSources?: unknown;
+}
+
+/**
+ * Generate a concise conversation title from the first exchange.
+ * Falls back to truncated user message if generation fails.
+ */
+async function generateConversationTitle(
+  userMessage: string,
+  assistantText: string
+): Promise<string> {
+  try {
+    const result = await generateReply({
+      system: "Summarize this conversation in 3-5 words. No punctuation. No quotes. Just the title.",
+      user: `User: ${userMessage}\nAssistant: ${assistantText}`,
+    });
+    const title = result.text.trim().replace(/[."']/g, "").slice(0, 60);
+    return title || userMessage.trim().slice(0, 60);
+  } catch {
+    return userMessage.trim().slice(0, 60);
+  }
 }
 
 /**
@@ -38,9 +59,9 @@ export async function persistTurn(args: PersistArgs): Promise<string | null> {
 
     let conversationId = args.conversationId;
 
-    // First turn of a new conversation: create it with a short title.
+    // First turn of a new conversation: create it with a generated title.
     if (!conversationId) {
-      const title = args.userMessage.trim().slice(0, 80) || "New conversation";
+      const title = await generateConversationTitle(args.userMessage, args.assistantText);
       const { data, error } = await supabase
         .from("bdm_conversations")
         .insert({ user_id: auth.user.id, title })

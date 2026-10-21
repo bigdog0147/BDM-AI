@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import BrandLogo from "../../components/BrandLogo";
 import { createSupabaseBrowserClient } from "../../../lib/supabase-browser";
 
 /**
@@ -61,6 +62,7 @@ export default function ResetPage() {
       setError("Password must be at least 8 characters.");
       return;
     }
+
     if (password !== confirm) {
       setError("The two passwords do not match.");
       return;
@@ -84,131 +86,78 @@ export default function ResetPage() {
   }
 
   return (
-    <main style={styles.main}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>BDM</h1>
-        <p style={styles.subtitle}>Set a new password</p>
+    <main className="auth-page auth-page-single">
+      <section className="auth-card" aria-label="Set a new password">
+        <div className="auth-card-head">
+          <BrandLogo variant="full" size={34} className="auth-logo" decorative />
+          <h1 className="auth-title">Set a new password</h1>
+          <p className="auth-sub">Choose a new password for your BDM account.</p>
+        </div>
 
-        {checking && <p style={styles.muted}>Checking your reset link…</p>}
+        {checking ? <p className="hint">Checking your reset link…</p> : null}
 
-        {!checking && !ready && !done && (
+        {!checking && !ready && !done ? (
           <>
-            <div style={styles.error}>
+            <p className="notice error" role="alert">
               This reset link is invalid or has expired.
-            </div>
-            <Link style={styles.link} href="/auth">
+            </p>
+            <Link className="auth-link" href="/auth">
               Request a new reset link
             </Link>
           </>
-        )}
+        ) : null}
 
-        {!checking && ready && !done && (
-          <form onSubmit={submit} style={styles.form}>
-            <label style={styles.label}>
+        {!checking && ready && !done ? (
+          <form onSubmit={submit} className="auth-form">
+            <label className="auth-label" htmlFor="reset-password">
               New password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                minLength={8}
-                autoComplete="new-password"
-                style={styles.input}
-              />
             </label>
-            <label style={styles.label}>
+            <input
+              id="reset-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              className="auth-input"
+            />
+
+            <label className="auth-label" htmlFor="reset-confirm">
               Confirm new password
-              <input
-                type="password"
-                value={confirm}
-                onChange={(event) => setConfirm(event.target.value)}
-                required
-                minLength={8}
-                autoComplete="new-password"
-                style={styles.input}
-              />
             </label>
+            <input
+              id="reset-confirm"
+              type="password"
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              className="auth-input"
+            />
 
-            {error && <div style={styles.error}>{error}</div>}
+            {error ? (
+              <p className="notice error" role="alert">
+                {error}
+              </p>
+            ) : null}
 
-            <button type="submit" disabled={busy} style={styles.submit}>
+            <button type="submit" className="btn primary auth-submit" disabled={busy}>
               {busy ? "Updating…" : "Update password"}
             </button>
           </form>
-        )}
+        ) : null}
 
-        {done && (
+        {done ? (
           <>
-            <div style={styles.notice}>
-              Password updated. Sign in with your new password.
-            </div>
-            <Link style={styles.link} href="/auth">
+            <p className="notice ok">Password updated. Sign in with your new password.</p>
+            <Link className="auth-link" href="/auth">
               Go to sign in
             </Link>
           </>
-        )}
-      </div>
+        ) : null}
+      </section>
     </main>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#0b0d12",
-    color: "#e6e8ee",
-    fontFamily: "system-ui, sans-serif",
-    padding: 24
-  },
-  card: {
-    width: "100%",
-    maxWidth: 380,
-    background: "#14171f",
-    border: "1px solid #262b36",
-    borderRadius: 14,
-    padding: 28
-  },
-  title: { margin: 0, fontSize: 28, letterSpacing: 1 },
-  subtitle: { margin: "6px 0 20px", color: "#9aa3b2", fontSize: 14 },
-  muted: { color: "#9aa3b2", fontSize: 14 },
-  form: { display: "flex", flexDirection: "column", gap: 14 },
-  label: { display: "flex", flexDirection: "column", gap: 6, fontSize: 13, color: "#9aa3b2" },
-  input: {
-    padding: "10px 12px",
-    background: "#0e1117",
-    border: "1px solid #2a303c",
-    borderRadius: 8,
-    color: "#e6e8ee",
-    fontSize: 14
-  },
-  error: {
-    background: "#3a1d1d",
-    border: "1px solid #6b2b2b",
-    color: "#ffb4b4",
-    padding: "8px 10px",
-    borderRadius: 8,
-    fontSize: 13
-  },
-  notice: {
-    background: "#1d3a2a",
-    border: "1px solid #2b6b45",
-    color: "#b4ffcf",
-    padding: "8px 10px",
-    borderRadius: 8,
-    fontSize: 13
-  },
-  submit: {
-    marginTop: 6,
-    padding: "11px 0",
-    background: "#3b6cff",
-    color: "white",
-    border: "none",
-    borderRadius: 8,
-    fontSize: 15,
-    cursor: "pointer"
-  },
-  link: { color: "#a9b6ff", fontSize: 13, marginTop: 12, display: "inline-block" }
-};

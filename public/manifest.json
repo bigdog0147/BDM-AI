@@ -1,0 +1,49 @@
+{
+  "name": "BDM - Personal AI",
+  "short_name": "BDM",
+  "description": "BDM personal AI assistant with chat, research, voice notes, and memory",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050B1C",
+  "theme_color": "#050B1C",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/bdm-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "short_name": "Chat",
+      "description": "Start a new conversation",
+      "url": "/",
+      "icons": [{ "src": "/brand/bdm-mark.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Research",
+      "short_name": "Research",
+      "description": "Web research with citations",
+      "url": "/?view=research",
+      "icons": [{ "src": "/brand/bdm-mark.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

@@ -3,6 +3,8 @@ import { createSupabaseServerClient } from "./supabase-server";
 export interface AuthUser {
   id: string;
   email?: string | null;
+  /** Supabase identity providers, e.g. ["email", "google"]. */
+  providers?: string[];
 }
 
 /**
@@ -21,7 +23,29 @@ export async function currentUser(): Promise<AuthUser | null> {
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase.auth.getUser();
     if (!data.user) return null;
-    return { id: data.user.id, email: data.user.email };
+
+    const providers = Array.from(
+      new Set(
+        (data.user.identities ?? [])
+          .map((identity) => identity.provider)
+          .filter((provider): provider is string => Boolean(provider))
+      )
+    );
+
+    if (providers.length === 0) {
+      const fromMetadata = data.user.app_metadata?.providers;
+      if (Array.isArray(fromMetadata)) {
+        for (const provider of fromMetadata) {
+          if (typeof provider === "string" && provider) providers.push(provider);
+        }
+      }
+    }
+
+    return {
+      id: data.user.id,
+      email: data.user.email,
+      providers
+    };
   } catch {
     return null;
   }

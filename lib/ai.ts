@@ -419,6 +419,11 @@ function classifyOpenAIError(error: unknown): ProviderError {
     return new ProviderError("openai", "auth", "openai unauthorized");
   }
   if (status === 429) {
+    // "Rate limited" and "the account has no credit" both arrive as 429 but
+    // mean very different things, so they are separated for the owner.
+    if (/insufficient_quota|no credits remaining|billing|quota/i.test(message)) {
+      return new ProviderError("openai", "rate_limit", "openai out of credit");
+    }
     return new ProviderError("openai", "rate_limit", "openai rate limited");
   }
   if (status !== null && status >= 500) {

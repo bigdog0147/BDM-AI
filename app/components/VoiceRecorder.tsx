@@ -24,11 +24,14 @@ function formatTime(seconds: number): string {
 
 export default function VoiceRecorder({
   configured,
+  signedIn = true,
   maxSeconds,
   onUseTranscript,
   onClose
 }: {
   configured: boolean;
+  /** Transcription runs on the server, so a signed-in account is required. */
+  signedIn?: boolean;
   maxSeconds: number;
   onUseTranscript: (text: string) => void;
   onClose: () => void;
@@ -269,17 +272,22 @@ export default function VoiceRecorder({
         </button>
       </div>
 
-      {!configured && (
-        <p className="notice">
-          Transcription is not configured. Add an OpenAI API key on the server to enable
-          it. Recording is disabled.
+      {!signedIn ? (
+        <p className="notice warn">
+          Voice notes need a signed-in account because the recording is
+          transcribed on the server. Sign in to record one, or simply type
+          your message in the composer.
         </p>
-      )}
-
-      {configured && (
+      ) : !configured ? (
+        <p className="notice">
+          Transcription is not configured. Add an OpenAI API key on the server
+          to enable it. Recording is disabled, and you can type your message
+          instead.
+        </p>
+      ) : (
         <p className="hint">
-          Your recording is uploaded to OpenAI for transcription only. It is not saved
-          by BDM: the audio is discarded after the transcript is returned.
+          Your recording is uploaded to OpenAI for transcription only. It is not
+          saved by BDM: the audio is discarded after the transcript is returned.
         </p>
       )}
 
@@ -302,7 +310,7 @@ export default function VoiceRecorder({
       )}
 
       <div className="panel-actions">
-        {(phase === "idle" || phase === "recorded") && configured && (
+        {(phase === "idle" || phase === "recorded") && configured && signedIn && (
           <button type="button" onClick={() => void start()} disabled={busy}>
             {phase === "recorded" ? "Re-record" : "Start recording"}
           </button>
@@ -312,9 +320,9 @@ export default function VoiceRecorder({
             Stop
           </button>
         )}
-        {phase === "recorded" && configured && (
+        {phase === "recorded" && configured && signedIn && (
           <button type="button" onClick={() => void transcribe()} disabled={busy}>
-            Transcribe
+            Send for transcription
           </button>
         )}
         {(phase === "recorded" || phase === "review") && (
@@ -326,7 +334,9 @@ export default function VoiceRecorder({
 
       {phase === "review" && (
         <div className="transcript-review">
-          <label htmlFor="transcript">Transcript (edit before sending)</label>
+          <label htmlFor="transcript">
+            Transcript - edit it, then insert it into the composer
+          </label>
           <textarea
             id="transcript"
             rows={4}
@@ -335,12 +345,16 @@ export default function VoiceRecorder({
           />
           <div className="panel-actions">
             <button type="button" onClick={useTranscript} disabled={!transcript.trim()}>
-              Use transcript
+              Insert into composer
             </button>
             <button type="button" className="ghost" onClick={() => void transcribe()} disabled={busy}>
               Transcribe again
             </button>
           </div>
+          <p className="hint">
+            Nothing is sent to the conversation until you send the message
+            yourself.
+          </p>
         </div>
       )}
 

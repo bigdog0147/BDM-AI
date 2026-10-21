@@ -22,6 +22,7 @@ const STATUS_BY_REASON = {
   not_configured: 503,
   empty_transcript: 422,
   timeout: 504,
+  no_credit: 402,
   failed: 502
 } as const;
 
@@ -166,7 +167,9 @@ export async function POST(request: Request): Promise<Response> {
           ? "Transcription timed out. Try a shorter recording."
           : result.reason === "empty_transcript"
             ? "No speech was detected in that recording."
-            : "The recording could not be transcribed.";
+            : result.reason === "no_credit"
+              ? "The OpenAI account has no credit left. Add credit at platform.openai.com/settings/organization/billing/ and try again."
+              : "The recording could not be transcribed.";
     return NextResponse.json(
       { error: message, reason: result.reason },
       { status: STATUS_BY_REASON[result.reason] ?? 502 }

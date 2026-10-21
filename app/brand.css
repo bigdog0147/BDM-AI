@@ -1,0 +1,532 @@
+/* =============================================================================
+   BDM brand presentation.
+
+   The hero (emblem + greeting + action cards) and the status rail. Kept in
+   its own file so the brand look survives edits to the rest of the
+   stylesheets.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------- hero */
+
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 28px 22px 18px;
+  width: 100%;
+}
+
+.hero-stars {
+  position: absolute;
+  inset: -20px -10px 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1.4px 1.4px at 18% 22%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.2px 1.2px at 74% 14%, rgba(255, 255, 255, 0.42), transparent),
+    radial-gradient(1.1px 1.1px at 46% 40%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1.6px 1.6px at 88% 62%, rgba(255, 255, 255, 0.36), transparent),
+    radial-gradient(1.1px 1.1px at 30% 72%, rgba(255, 255, 255, 0.28), transparent),
+    radial-gradient(1.3px 1.3px at 62% 82%, rgba(255, 255, 255, 0.32), transparent);
+}
+
+.hero-emblem {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  filter: drop-shadow(0 18px 46px rgba(245, 196, 81, 0.3))
+    drop-shadow(0 0 60px rgba(21, 94, 239, 0.32));
+  animation: emblem-float 7s ease-in-out infinite;
+}
+
+@keyframes emblem-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.hero .welcome-eyebrow {
+  position: relative;
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bdm-gold);
+}
+
+.hero-title {
+  position: relative;
+  margin: 8px 0 0;
+  font-size: clamp(26px, 3.4vw, 38px);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.hero-sub {
+  position: relative;
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  color: var(--bdm-muted);
+}
+
+.action-cards {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 880px;
+  margin-top: 26px;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
+  border-radius: var(--bdm-radius-lg);
+  border: 1px solid var(--bdm-line-soft);
+  background: linear-gradient(165deg, rgba(11, 27, 58, 0.78), rgba(6, 14, 32, 0.7));
+  color: var(--bdm-text);
+  cursor: pointer;
+  transition: border-color var(--bdm-fast), transform var(--bdm-fast),
+    box-shadow var(--bdm-fast);
+}
+
+.action-card:hover {
+  border-color: var(--bdm-line);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(2, 6, 18, 0.5), 0 0 0 1px rgba(245, 196, 81, 0.16);
+}
+
+.action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid var(--bdm-line);
+  background: rgba(21, 94, 239, 0.14);
+  color: var(--bdm-electric);
+}
+
+.action-card:hover .action-icon {
+  color: var(--bdm-gold);
+  background: rgba(245, 196, 81, 0.12);
+}
+
+.action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.action-text strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.action-text small {
+  font-size: 12px;
+  color: var(--bdm-muted);
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------------------------- rail */
+
+.rail {
+  border-left: 1px solid var(--bdm-line-soft);
+  background: linear-gradient(180deg, rgba(6, 14, 32, 0.8), rgba(4, 9, 22, 0.92));
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.rail-card {
+  border: 1px solid var(--bdm-line-soft);
+  border-radius: var(--bdm-radius-lg);
+  background: linear-gradient(165deg, rgba(11, 27, 58, 0.72), rgba(6, 14, 32, 0.6));
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.rail-title svg {
+  color: var(--bdm-gold);
+}
+
+.rail-link {
+  border: 0;
+  background: transparent;
+  color: var(--bdm-electric);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+.rail-link:hover {
+  text-decoration: underline;
+}
+
+.rail-actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rail-action {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--bdm-line-soft);
+  background: rgba(21, 94, 239, 0.12);
+  color: var(--bdm-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--bdm-fast), transform var(--bdm-fast);
+}
+
+.rail-action:hover:not(:disabled) {
+  background: rgba(21, 94, 239, 0.24);
+  transform: translateX(2px);
+}
+
+.rail-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rail-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  border: 1px solid var(--bdm-line-strong);
+  background: rgba(21, 94, 239, 0.16);
+  color: var(--bdm-electric);
+}
+
+.rail-action-icon.gold {
+  border-color: var(--bdm-line);
+  background: rgba(245, 196, 81, 0.12);
+  color: var(--bdm-gold);
+}
+
+.rail-action span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rail-action strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.rail-action small {
+  font-size: 11.5px;
+  color: var(--bdm-muted);
+}
+
+.rail-chats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-chat {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--bdm-muted);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--bdm-fast), color var(--bdm-fast);
+}
+
+.rail-chat:hover {
+  background: rgba(168, 185, 214, 0.08);
+  color: var(--bdm-text);
+}
+
+.rail-chat.active {
+  background: rgba(21, 94, 239, 0.16);
+  color: var(--bdm-text);
+}
+
+.rail-chat-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-chat-time {
+  font-size: 11px;
+  color: var(--bdm-faint);
+  flex: 0 0 auto;
+}
+
+.rail-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--bdm-faint);
+  line-height: 1.5;
+}
+
+.rail-health {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--bdm-warning);
+}
+
+.rail-health.ok {
+  color: var(--bdm-success);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bdm-warning);
+  box-shadow: 0 0 10px rgba(255, 213, 154, 0.5);
+  flex: 0 0 auto;
+}
+
+.rail-health.ok .status-dot {
+  background: var(--bdm-success);
+  box-shadow: 0 0 10px rgba(98, 230, 167, 0.55);
+}
+
+.rail-services {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.rail-services li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.rail-service-name {
+  color: var(--bdm-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+
+.rail-service-detail {
+  color: var(--bdm-text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.rail-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bdm-faint);
+}
+
+/* ------------------------------------------------------------- responsive */
+
+/* The workspace shell: sidebar, conversation, status rail. */
+.app {
+  grid-template-columns: 276px minmax(0, 1fr) 320px;
+}
+
+/* The emblem carries the empty state, so it gets room to breathe. */
+.welcome-mark {
+  filter: drop-shadow(0 16px 40px rgba(245, 196, 81, 0.28))
+    drop-shadow(0 0 44px rgba(21, 94, 239, 0.25));
+}
+
+.welcome-mark img {
+  width: 118px;
+  height: auto;
+}
+
+/* Gold-framed action tiles, in the language of the brand. */
+.suggestion .suggestion-icon,
+.welcome .suggestion-icon {
+  border-color: var(--bdm-line);
+  background: rgba(21, 94, 239, 0.14);
+  color: var(--bdm-electric);
+}
+
+.suggestion:hover .suggestion-icon,
+.welcome .suggestion:hover .suggestion-icon {
+  background: rgba(245, 196, 81, 0.14);
+  color: var(--bdm-gold);
+}
+
+@media (max-width: 1280px) {
+  .app {
+    grid-template-columns: 272px minmax(0, 1fr);
+  }
+
+  .rail {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero {
+    padding: 18px 16px 8px;
+  }
+
+  .hero-emblem {
+    width: 132px;
+    height: 132px;
+  }
+
+  .action-cards {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    margin-top: 18px;
+  }
+
+  .action-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 13px;
+    padding: 13px 14px;
+    text-align: left;
+  }
+
+  .action-text {
+    text-align: left;
+  }
+}
+
+/* --------------------------------------------------- narrow-screen safety */
+
+/* Nothing may push the workspace wider than the viewport. */
+@media (max-width: 760px) {
+  .app,
+  .workspace,
+  .workspace-main,
+  .chat-scroll,
+  .chat-inner,
+  .welcome,
+  .composer,
+  .topbar {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .suggestions,
+  .suggestion-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .suggestion,
+  .suggestion-card {
+    min-width: 0;
+  }
+
+  .suggestion-text,
+  .suggestion-card > span {
+    min-width: 0;
+  }
+
+  .welcome-title,
+  .hero-title {
+    font-size: 26px;
+  }
+
+  .topbar-actions {
+    flex: 0 0 auto;
+  }
+
+  .topbar-actions .btn span,
+  .topbar-actions .btn {
+    white-space: nowrap;
+  }
+
+  .composer-row,
+  .composer {
+    flex-wrap: wrap;
+  }
+
+  .composer button,
+  .send-btn {
+    flex: 0 0 auto;
+  }
+}
+
+/* ------------------------------------------------------------ light theme */
+
+[data-theme="light"] .hero-emblem {
+  filter: drop-shadow(0 14px 34px rgba(21, 94, 239, 0.18));
+}
+
+[data-theme="light"] .action-card {
+  background: #ffffff;
+}
