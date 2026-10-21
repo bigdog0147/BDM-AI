@@ -1,6 +1,6 @@
 # Render deployment and rollback runbook
 
-Service: `bdm-ai` - <https://bdm-ai.onrender.com/>
+Service: `bdm-ai` - <https://bdmai.cloud/>
 Plan: free (the instance sleeps when idle; the first request after a sleep can
 take a few seconds and may briefly return `503` while it wakes).
 
@@ -57,23 +57,23 @@ npm run dev:preview        # next dev -p 3011
 
 ## 2. Configuration the owner must set
 
-### 2.1 Google sign-in (not yet live)
+### 2.1 Google sign-in (live)
 
 Create a **Web application** OAuth client in Google Cloud Console.
 
 | Setting | Value |
 | --- | --- |
-| Authorized redirect URI | `https://bdm-ai.onrender.com/auth/callback/google` |
-| Authorized JavaScript origin | `https://bdm-ai.onrender.com` |
-| Local redirect URI (development) | `http://localhost:3011/auth/callback/google` |
+| Authorized redirect URI | `https://bdmai.cloud/auth/callback/google` |
+| Authorized JavaScript origin | `https://bdmai.cloud` |
+| Local redirect URI (development) | `http://localhost:3001/auth/callback/google` |
 
 Then in the Render dashboard:
 
 | Variable | Value | Currently |
 | --- | --- | --- |
-| `GOOGLE_CLIENT_ID` | from Google Cloud | **missing** |
-| `GOOGLE_CLIENT_SECRET` | from Google Cloud | **missing** |
-| `GOOGLE_REDIRECT_URI` | `https://bdm-ai.onrender.com/auth/callback/google` | set in `render.yaml` |
+| `GOOGLE_CLIENT_ID` | from Google Cloud | **set** |
+| `GOOGLE_CLIENT_SECRET` | from Google Cloud | **set** |
+| `GOOGLE_REDIRECT_URI` | `https://bdmai.cloud/auth/callback/google` | set in `render.yaml` |
 
 And in Supabase Auth, enable the **Google** provider with the same client ID
 and secret.
@@ -144,7 +144,7 @@ Email tool in the composer will not work.
 
    Expect `"name": "BDM - Personal AI"`, three icons and two shortcuts.
 6. Promote the preview to production, then repeat the same two checks on
-   `https://bdm-ai.onrender.com`.
+   `https://bdmai.cloud`.
 7. Complete a real Google sign-up, a returning Google sign-in, and a password
    account that connects Google from Settings. Confirm that a password account
    is never linked by email alone.
