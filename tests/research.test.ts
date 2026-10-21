@@ -27,6 +27,7 @@ const ENV_KEYS = [
   "BDM_SEARCH_PROVIDER",
   "BRAVE_SEARCH_API_KEY",
   "TAVILY_API_KEY",
+  "TAVILY_KEYLESS",
   "SEARXNG_URL",
   "AI_PROVIDER",
   "OLLAMA_MODEL",
@@ -66,6 +67,7 @@ beforeEach(() => {
   delete process.env.BDM_SEARCH_PROVIDER;
   delete process.env.BRAVE_SEARCH_API_KEY;
   delete process.env.TAVILY_API_KEY;
+  delete process.env.TAVILY_KEYLESS;
   delete process.env.SEARXNG_URL;
   delete process.env.OLLAMA_API_KEY;
   delete process.env.OLLAMA_API_HOST;
@@ -256,11 +258,55 @@ describe("Tavily search", () => {
     expect(result.sources[0].publishedDate).toBe("2026-02-02");
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers.authorization).toBe("Bearer tvly-key");
+    expect(headers["x-tavily-access-mode"]).toBeUndefined();
     expect(JSON.parse(String(init.body))).toMatchObject({
       query: "news",
       max_results: 3,
       include_answer: false
     });
+  });
+
+  it("uses keyless access when enabled and no key is present", async () => {
+    process.env.BDM_SEARCH_PROVIDER = "tavily";
+    process.env.TAVILY_KEYLESS = "1";
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        results: [
+          {
+            title: "Keyless",
+            url: "https://example.com/keyless",
+            content: "Body"
+          }
+        ]
+      })
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { searchStatus, searchWeb } = await import("../lib/search");
+    expect(searchStatus()).toEqual({ provider: "tavily", configured: true });
+
+    const result = await searchWeb("keyless");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.provider).toBe("tavily");
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["x-tavily-access-mode"]).toBe("keyless");
+    expect(headers.authorization).toBeUndefined();
+  });
+
+  it("stays unconfigured without a key or explicit keyless opt-in", async () => {
+    process.env.BDM_SEARCH_PROVIDER = "tavily";
+
+    const { searchStatus, searchWeb } = await import("../lib/search");
+    expect(searchStatus()).toEqual({ provider: "tavily", configured: false });
+
+    const result = await searchWeb("no key");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("not_configured");
   });
 });
 
