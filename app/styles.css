@@ -11,6 +11,9 @@
 @import "./dashboard.css";
 @import "./components.css";
 @import "./brand.css";
+/* Premium royal-blue-and-gold accents. Imported last so the accent layer
+   sits above the other four without any of them having to change. */
+@import "./premium.css";
 
 :root {
   color-scheme: dark;
