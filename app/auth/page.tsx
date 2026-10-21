@@ -53,6 +53,29 @@ export default function AuthPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  /**
+   * Whether the server has Google sign-in configured. `null` means the
+   * server has not answered yet, so the button is shown without a warning
+   * rather than flashing a false alarm.
+   */
+  const [googleConfigured, setGoogleConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/status")
+      .then((response) => response.json())
+      .then((data: { google?: { configured?: boolean } }) => {
+        if (cancelled) return;
+        setGoogleConfigured(data.google?.configured === true);
+      })
+      .catch(() => {
+        // The status endpoint is optional here; the button still works.
+        if (!cancelled) setGoogleConfigured(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -222,10 +245,18 @@ export default function AuthPage() {
             <GoogleIcon size={18} />
             Continue with Google
           </a>
-          <p className="hint google-hint">
-            Google verifies your email on the server before BDM creates an
-            account.
-          </p>
+          {googleConfigured === false ? (
+            <p className="notice warn google-hint" role="status">
+              Google sign-in is not configured on this server yet. Use email and
+              password below, or ask the owner to add the Google OAuth
+              credentials.
+            </p>
+          ) : (
+            <p className="hint google-hint">
+              Google verifies your email on the server before BDM creates an
+              account.
+            </p>
+          )}
         </div>
 
         <div className="auth-divider">
