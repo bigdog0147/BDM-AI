@@ -1,0 +1,14 @@
+{
+  "count": 5,
+  "scope": "dev dependencies only (npm audit without --omit=dev)",
+  "packages": [
+    "braces",
+    "fast-glob",
+    "micromatch",
+    "@next/eslint-plugin-next",
+    "eslint-config-next"
+  ],
+  "reason": "Lint tooling only; none of these ship with the application. The chain starts inside @next/eslint-plugin-next (fast-glob -> micromatch -> braces) and braces 3.0.3 is both the newest published release and the affected one, so no upgrade can clear it. Production dependencies are clean (npm audit --omit=dev reports 0).",
+  "reviewed": "2026-10-19",
+  "policy": "The weekly audit-dev job fails if this count rises above the baseline. When an upstream fix lands and the count drops, lower this number."
+}

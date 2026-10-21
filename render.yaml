@@ -3,7 +3,7 @@ services:
     name: bdm-ai
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -11,11 +11,53 @@ services:
         value: "22"
       - key: OPENAI_API_KEY
         sync: false
+      # Verified against the OpenAI Responses API model list (2026-07-09).
+      # Change only to a model your account can actually access.
       - key: OPENAI_MODEL
         value: gpt-5.6-luna
-      - key: BDM_WEB_SEARCH_ENABLED
-        value: "true"
+      # Ollama Cloud is the primary provider for this service. Local Ollama
+      # (OLLAMA_HOST / OLLAMA_MODEL) is not reachable from Render.
+      # Set OLLAMA_API_KEY in the Render dashboard; never commit it here.
+      - key: AI_PROVIDER
+        value: ollama
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: OLLAMA_API_MODEL
+        value: gemma4:31b
+      - key: OLLAMA_API_HOST
+        value: https://ollama.com
+      # Web research. Set the key for exactly one provider: TAVILY_API_KEY,
+      # BRAVE_SEARCH_API_KEY or SEARXNG_URL. The key stays on the server and
+      # only the user's question is ever sent to the provider.
+      # NOTE: BDM_WEB_SEARCH_ENABLED is not read by the application; the
+      # provider is auto-detected from the key that is present.
+      - key: TAVILY_API_KEY
+        sync: false
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      # Google OIDC. Register the value below as an authorized redirect URI in
+      # Google Cloud Console and enable the Google provider in Supabase Auth.
+      # SUPABASE_SERVICE_ROLE_KEY is also required for the no-silent-linking
+      # identity check.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://bdm-ai.onrender.com/auth/callback/google
+      # Email is opt-in: all three of these plus the enabled switch are
+      # required before /api/email/send will do anything.
+      - key: BDM_EMAIL_ENABLED
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
+      # Server-only. Enables durable webhook storage; never expose this with a
+      # NEXT_PUBLIC_ prefix.
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false

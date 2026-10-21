@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly dependency check: catches a new advisory, or a fix landing for
+    # the ones already documented, without anyone having to remember to look.
+    - cron: "17 6 * * 1"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Bound the job: the known lint advisories are a stack-exhaustion issue in
+    # glob expansion, so a pathological pattern can crash or hang the lint
+    # step. A timeout turns a hung pipeline into a failed one.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-5.6-luna
+
+  audit:
+    name: production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      # Production dependencies only: this is what actually ships, and it is
+      # clean today. Any high-or-worse advisory in the shipped tree blocks.
+      - run: npm audit --omit=dev --audit-level=high
+
+  audit-dev:
+    name: dev dependency audit (ratchet)
+    # Weekly only, and it is a ratchet rather than a gate: the current dev
+    # advisories have no upstream fix (braces 3.0.3 is both the newest
+    # release and the affected one), so blocking on them would leave the
+    # pipeline permanently red. This fails only when the count goes UP, and
+    # passes silently when an upstream fix lands and the count drops.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Compare against the recorded baseline
+        run: |
+          count=$({ npm audit --json 2>/dev/null || true; } | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(j.metadata.vulnerabilities.total)})")
+          baseline=$(node -p "require('./.audit-baseline.json').count")
+          echo "dev advisories: $count (baseline $baseline)"
+          if [ "$count" -gt "$baseline" ]; then
+            echo "::error::dev dependency advisories rose above the baseline"
+            exit 1
+          fi
+

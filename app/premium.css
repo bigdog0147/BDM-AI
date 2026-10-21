@@ -1,0 +1,425 @@
+/* =============================================================================
+   Premium accents: royal blue and gold.
+
+   A cross-cutting layer that sits above the other four (imported last from
+   styles.css). It owns nothing structural - only the gold and royal-blue
+   accents that make the shell read as premium: the hairline under the
+   topbar, the gold marker on the active nav item, gold-rimmed suggestion
+   cards and the send button, and a gold scrollbar.
+
+   Everything here is additive. No selector here changes layout, and every
+   rule is a small, reviewable delta on top of the shell that
+   dashboard.css owns.
+   ========================================================================== */
+
+/* ------------------------------------------------------- topbar gold hairline */
+
+.topbar {
+  position: relative;
+  box-shadow: 0 10px 34px rgba(2, 6, 18, 0.45);
+}
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(245, 196, 81, 0.42) 22%,
+    rgba(50, 135, 255, 0.38) 62%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* ------------------------------------------------- active nav item in royal+gold */
+
+.nav-item.active {
+  position: relative;
+  background: linear-gradient(
+    100deg,
+    rgba(21, 94, 239, 0.34),
+    rgba(21, 94, 239, 0.12)
+  );
+  border-color: rgba(245, 196, 81, 0.3);
+  color: var(--bdm-text);
+  box-shadow: inset 0 0 0 1px rgba(21, 94, 239, 0.18);
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--bdm-gold), var(--bdm-gold-rich));
+  box-shadow: 0 0 10px rgba(245, 196, 81, 0.5);
+}
+
+.nav-item.active .nav-icon {
+  color: var(--bdm-gold);
+}
+
+/* -------------------------------------------------- suggestion cards with gold edge */
+
+.suggestion {
+  border-color: rgba(245, 196, 81, 0.18);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(21, 94, 239, 0.16), transparent 58%),
+    linear-gradient(165deg, rgba(11, 27, 58, 0.86), rgba(7, 17, 40, 0.74));
+  transition:
+    border-color var(--bdm-fast),
+    box-shadow var(--bdm-fast),
+    transform var(--bdm-fast);
+}
+
+.suggestion:hover {
+  border-color: rgba(245, 196, 81, 0.42);
+  box-shadow: 0 14px 34px rgba(2, 6, 18, 0.42);
+  transform: translateY(-2px);
+}
+
+.suggestion-icon {
+  border-color: rgba(245, 196, 81, 0.3);
+  background: rgba(21, 94, 239, 0.18);
+  color: var(--bdm-electric);
+}
+
+.suggestion:hover .suggestion-icon {
+  border-color: rgba(245, 196, 81, 0.5);
+  color: var(--bdm-gold);
+}
+
+/* ------------------------------------------------------- send button with gold rim */
+
+.send-btn {
+  background: linear-gradient(140deg, var(--bdm-royal), var(--bdm-electric));
+  box-shadow:
+    0 0 0 1px rgba(245, 196, 81, 0.34),
+    0 12px 30px rgba(21, 94, 239, 0.34);
+}
+
+.send-btn:hover:not(:disabled) {
+  box-shadow:
+    0 0 0 1px rgba(245, 196, 81, 0.6),
+    0 16px 36px rgba(21, 94, 239, 0.42);
+}
+
+/* Keep the gold rim visible at rest: the disabled state dims it via opacity 0.45. */
+.send-btn:disabled {
+  box-shadow: 0 0 0 1px rgba(245, 196, 81, 0.34);
+}
+
+/* --------------------------------------------------------- gold focus on composer */
+
+.composer-box:focus-within {
+  border-color: rgba(245, 196, 81, 0.42);
+  box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.12);
+}
+
+/* -------------------------------------------------------------- gold scrollbar */
+
+.chat-scroll {
+  scrollbar-color: rgba(245, 196, 81, 0.34) transparent;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(245, 196, 81, 0.42), rgba(21, 94, 239, 0.4));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ------------------------------------------------- soft gold halo on the emblem */
+
+.welcome-mark {
+  filter: drop-shadow(0 10px 26px rgba(245, 196, 81, 0.18));
+}
+
+/* =============================================================================
+   Sign-in, settings and brand screens.
+
+   The same two colours, applied to the surfaces outside the chat shell.
+   ========================================================================== */
+
+/* -------------------------------------------------- sign-in hero in royal+gold */
+
+.auth-showcase-title {
+  color: var(--bdm-gold);
+  background-image: linear-gradient(
+    96deg,
+    #ffffff 0%,
+    var(--bdm-electric) 44%,
+    var(--bdm-gold) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --------------------------------------------------------- auth card gold rule */
+
+.auth-card {
+  position: relative;
+  border-color: rgba(245, 196, 81, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(245, 196, 81, 0.1),
+    0 26px 64px rgba(2, 6, 18, 0.6);
+}
+
+.auth-card::before {
+  content: "";
+  position: absolute;
+  left: 26px;
+  right: 26px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(245, 196, 81, 0.5) 35%,
+    rgba(50, 135, 255, 0.42) 70%,
+    transparent
+  );
+}
+
+/* --------------------------------------------------------- gold focus in fields */
+
+/* The generic field rule is more specific than a bare .auth-input:focus,
+   so the accent needs the field in the selector to win. */
+.auth-field .auth-input:focus {
+  border-color: rgba(245, 196, 81, 0.5);
+  box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.12);
+}
+
+/* ------------------------------------------------------------ gold divider rule */
+
+.auth-divider::before,
+.auth-divider::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(245, 196, 81, 0.34)
+  );
+}
+
+/* ------------------------------------------------- submit button with gold rim */
+
+/* The button also carries .btn.primary, so this needs to out-specify that
+   two-class rule to win on the gradient and the rim. */
+.auth-form .btn.auth-submit {
+  background: linear-gradient(140deg, var(--bdm-royal), var(--bdm-electric));
+  box-shadow:
+    0 0 0 1px rgba(245, 196, 81, 0.34),
+    0 12px 30px rgba(21, 94, 239, 0.32);
+}
+
+.auth-form .btn.auth-submit:hover:not(:disabled) {
+  box-shadow:
+    0 0 0 1px rgba(245, 196, 81, 0.6),
+    0 16px 36px rgba(21, 94, 239, 0.4);
+}
+
+/* ----------------------------------------------- google button keeps a gold edge */
+
+.google-btn {
+  border-color: rgba(245, 196, 81, 0.4);
+}
+
+/* ------------------------------------------------------------- settings screen */
+
+.settings-topbar {
+  position: relative;
+}
+
+.settings-topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(245, 196, 81, 0.36) 30%,
+    rgba(50, 135, 255, 0.34) 70%,
+    transparent
+  );
+}
+
+.capability-card {
+  border-color: rgba(245, 196, 81, 0.16);
+  transition: border-color var(--bdm-fast), box-shadow var(--bdm-fast);
+}
+
+.capability-card:hover {
+  border-color: rgba(245, 196, 81, 0.38);
+  box-shadow: 0 12px 30px rgba(2, 6, 18, 0.4);
+}
+
+.capability-icon {
+  border-color: rgba(245, 196, 81, 0.3);
+}
+
+/* --------------------------------------------------------------- brand screen */
+
+.brand-tile {
+  border-color: rgba(245, 196, 81, 0.2);
+}
+
+.brand-tile-label {
+  color: var(--bdm-gold);
+}
+
+/* =============================================================================
+   The empty state.
+
+   The conversation column is top-aligned, so below the welcome block the
+   screen is a large void. This fills it with light rather than furniture:
+   a royal-blue field with a warm gold edge behind the greeting, a gold
+   hairline with a diamond between the orientation line and the cards, and
+   a soft horizon glow falling into the space underneath.
+
+   Every rule here is an overlay: nothing moves, nothing reflows, and the
+   decoration never intercepts a click.
+   ========================================================================== */
+
+/* Both decorations live on the scroll container's background.
+ *
+ * They used to be pseudo elements: an aurora on the welcome block and a
+ * horizon glow hanging 36vh below it. Absolute layers extend the scrollable
+ * area of their ancestor, which made an empty dashboard scroll and let the
+ * composer slice the suggestion cards — badly at short viewport heights.
+ * Backgrounds are painted inside the box, so they add exactly zero overflow
+ * at every size, and the two brand colours still read as one lit surface. */
+.chat-scroll {
+  background-image:
+    radial-gradient(46% 58% at 20% 6%, rgba(21, 94, 239, 0.2), transparent 70%),
+    radial-gradient(38% 50% at 84% 20%, rgba(245, 196, 81, 0.13), transparent 72%),
+    radial-gradient(58% 42% at 50% 100%, rgba(21, 94, 239, 0.16), transparent 74%);
+  background-repeat: no-repeat;
+  background-attachment: scroll;
+}
+
+/* Give every suggestion title the same two-line box, so the descriptions
+ * below them start on one shared baseline. "Understand a topic" wraps to two
+ * lines and used to drop its description 9px below the other three. */
+.suggestion-title {
+  min-height: 2.8em;
+  min-height: 2lh;
+}
+
+/* ----------------------------------------------------------------- empty state
+ *
+ * Centre the greeting in the column the way every chat surface does: the
+ * composer owns the bottom, so the hero sits in the optical middle instead of
+ * hugging the topbar and leaving a void underneath.
+ *
+ * `safe` keeps the top edge reachable when the hero is taller than the column
+ * (short windows, zoomed-in text). Browsers that do not understand the keyword
+ * drop the declaration and keep the original top alignment, so this cannot
+ * regress them. The `:has()` guard means a conversation still starts at the
+ * top — only the welcome-only state is centred. */
+.chat-inner:has(> .welcome) {
+  justify-content: safe center;
+  min-height: 100%;
+}
+
+/* Short windows: shrink the hero instead of letting the composer slice the
+ * cards. At 566px tall the column is ~352px and the full hero needs ~400px,
+ * so the emblem, spacing and copy are tightened until it fits. */
+@media (max-height: 700px) {
+  .welcome {
+    gap: 5px;
+  }
+
+  .welcome-title {
+    font-size: 22px;
+    letter-spacing: -0.01em;
+  }
+
+  .welcome-sub {
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .welcome-sub::after {
+    bottom: -9px;
+  }
+
+  .suggestions {
+    margin-top: 5px;
+  }
+
+  .suggestion {
+    padding: 8px 10px;
+  }
+
+  .suggestion-desc {
+    font-size: 11px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* The eyebrow carries the two brand colours. */
+.welcome-eyebrow {
+  color: var(--bdm-gold);
+  background-image: linear-gradient(
+    90deg,
+    var(--bdm-gold) 0%,
+    var(--bdm-electric) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* A hairline with a gold diamond, between the orientation line and the cards. */
+.welcome-sub {
+  position: relative;
+}
+
+.welcome-sub::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -13px;
+  height: 1px;
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(245, 196, 81, 0.95) 0 2px,
+      transparent 2.5px
+    ),
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(245, 196, 81, 0.34) 32%,
+      rgba(50, 135, 255, 0.3) 68%,
+      transparent
+    );
+}
+

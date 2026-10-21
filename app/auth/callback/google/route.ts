@@ -1,143 +1,239 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+import { currentUser } from "../../../../lib/auth";
+import {
+  exchangeGoogleCode,
+  getGoogleConfig,
+  getGoogleJwks,
+  GOOGLE_AUTH_COOKIE,
+  parseOAuthTransaction,
+  safeEqual,
+  verifyGoogleIdToken,
+  type GoogleAuthErrorCode,
+  type GoogleMode
+} from "../../../../lib/google-auth";
+import {
+  createGoogleLink,
+  createGoogleUser,
+  deleteGoogleLink,
+  deleteGoogleUser,
+  findGoogleLink,
+  findGoogleLinkForUser,
+  touchGoogleLink
+} from "../../../../lib/google-identity-store";
+import { completeGoogleSignIn } from "../../../../lib/google-signin";
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "https://bdmai.cloud/auth/callback/google";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const code = searchParams.get("code");
-  const error = searchParams.get("error");
+type PendingCookie = { name: string; value: string; options: CookieOptions };
 
-  if (error) {
-    console.error("Google OAuth error:", error);
-    return NextResponse.redirect(new URL("/?error=oauth_denied", request.url));
+function errorPath(mode: GoogleMode, code: string): string {
+  return mode === "link"
+    ? `/settings?google_error=${code}`
+    : `/auth?error=${code}`;
+}
+
+function successPath(mode: GoogleMode): string {
+  return mode === "link" ? "/settings?google=linked" : "/";
+}
+
+function finalize(
+  request: NextRequest,
+  mode: GoogleMode,
+  path: string,
+  pending: PendingCookie[]
+): NextResponse {
+  const response = NextResponse.redirect(new URL(path, request.url));
+  for (const cookie of pending) {
+    response.cookies.set(cookie.name, cookie.value, cookie.options);
+  }
+  response.cookies.set(GOOGLE_AUTH_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0
+  });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+function failureCode(error: GoogleAuthErrorCode): string {
+  switch (error) {
+    case "email_unverified":
+      return "google_email_unverified";
+    case "nonce_mismatch":
+      return "google_nonce";
+    case "token_exchange_failed":
+      return "google_token_exchange";
+    case "bad_redirect_uri":
+      return "google_redirect_uri";
+    case "not_configured":
+      return "google_not_configured";
+    default:
+      return "google_token_invalid";
+  }
+}
+
+/**
+ * Google OAuth callback.
+ *
+ * 1. Validate state and the short-lived httpOnly transaction cookie.
+ * 2. Exchange the authorization code with Google using PKCE.
+ * 3. Verify the ID token signature, issuer, audience, expiry, nonce, and
+ *    verified-email claim.
+ * 4. Apply the account-linking policy and establish the existing Supabase
+ *    session with `signInWithIdToken`.
+ */
+export async function GET(request: NextRequest): Promise<Response> {
+  const transaction = parseOAuthTransaction(
+    request.cookies.get(GOOGLE_AUTH_COOKIE)?.value
+  );
+  const mode: GoogleMode = transaction?.mode ?? "signin";
+
+  const url = new URL(request.url);
+  const providerError = url.searchParams.get("error");
+  if (providerError) {
+    return finalize(
+      request,
+      mode,
+      errorPath(
+        mode,
+        providerError === "access_denied" ? "google_cancelled" : "google_denied"
+      ),
+      []
+    );
   }
 
-  if (!code) {
-    return NextResponse.redirect(new URL("/?error=no_code", request.url));
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  if (!transaction || !code || !state || !safeEqual(state, transaction.state)) {
+    return finalize(request, mode, errorPath(mode, "google_state"), []);
   }
 
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-    console.error("Google OAuth credentials not configured");
-    return NextResponse.redirect(new URL("/?error=not_configured", request.url));
+  const config = getGoogleConfig(request.url);
+  if (!config.ok) {
+    return finalize(
+      request,
+      mode,
+      errorPath(
+        mode,
+        config.reason === "bad_redirect_uri"
+          ? "google_redirect_uri"
+          : "google_not_configured"
+      ),
+      []
+    );
   }
 
-  try {
-    // Exchange authorization code for tokens
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: GOOGLE_REDIRECT_URI,
-        grant_type: "authorization_code",
-      }),
-    });
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    return finalize(request, mode, errorPath(mode, "auth_not_configured"), []);
+  }
 
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.text();
-      console.error("Token exchange failed:", errorData);
-      return NextResponse.redirect(new URL("/?error=token_exchange_failed", request.url));
-    }
-
-    const tokens = await tokenResponse.json();
-    const { access_token, refresh_token, id_token } = tokens;
-
-    // Get user info from Google
-    const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-
-    if (!userResponse.ok) {
-      return NextResponse.redirect(new URL("/?error=userinfo_failed", request.url));
-    }
-
-    const googleUser = await userResponse.json();
-    const { email, name, picture, id: googleId } = googleUser;
-
-    if (!email) {
-      return NextResponse.redirect(new URL("/?error=no_email", request.url));
-    }
-
-    // Create Supabase client with service role for server-side operations
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Check if user exists, create or update
-    const { data: existingUser, error: fetchError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email)
-      .single();
-
-    let userId: string;
-
-    if (fetchError && fetchError.code === "PGRST116") {
-      // User doesn't exist, create new user
-      const { data: newUser, error: createError } = await supabase
-        .from("users")
-        .insert({
-          email,
-          name: name || email.split("@")[0],
-          avatar_url: picture,
-          google_id: googleId,
-          email_verified: true,
-        })
-        .select("id")
-        .single();
-
-      if (createError) {
-        console.error("User creation failed:", createError);
-        return NextResponse.redirect(new URL("/?error=user_creation_failed", request.url));
+  const pending: PendingCookie[] = [];
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        for (const cookie of cookiesToSet) {
+          pending.push(cookie);
+        }
       }
-      userId = newUser.id;
-    } else if (fetchError) {
-      console.error("User fetch failed:", fetchError);
-      return NextResponse.redirect(new URL("/?error=db_error", request.url));
-    } else {
-      // User exists, update Google info if needed
-      userId = existingUser.id;
-      await supabase
-        .from("users")
-        .update({
-          google_id: googleId,
-          avatar_url: picture || existingUser.avatar_url,
-          name: name || existingUser.name,
-          email_verified: true,
-        })
-        .eq("id", userId);
     }
+  });
 
-    // Create session cookie
-    const sessionResponse = await supabase.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-      options: { redirectTo: "https://bdmai.cloud" },
+  let tokens;
+  try {
+    tokens = await exchangeGoogleCode({
+      config: config.config,
+      code,
+      verifier: transaction.verifier
     });
-
-    if (sessionResponse.error) {
-      console.error("Session creation failed:", sessionResponse.error);
-      return NextResponse.redirect(new URL("/?error=session_failed", request.url));
-    }
-
-    // Redirect to home with success
-    const response = NextResponse.redirect(new URL("/", request.url));
-    response.cookies.set("sb-access-token", sessionResponse.data.properties?.access_token || "", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-    });
-
-    return response;
   } catch (error) {
-    console.error("OAuth callback error:", error);
-    return NextResponse.redirect(new URL("/?error=server_error", request.url));
+    const codeValue =
+      error && typeof error === "object" && "code" in error
+        ? (error.code as GoogleAuthErrorCode)
+        : "token_exchange_failed";
+    return finalize(
+      request,
+      mode,
+      errorPath(mode, failureCode(codeValue)),
+      pending
+    );
   }
+
+  let identity;
+  try {
+    identity = await verifyGoogleIdToken(tokens.idToken, {
+      clientId: config.config.clientId,
+      nonce: transaction.nonce,
+      jwks: getGoogleJwks()
+    });
+  } catch (error) {
+    const codeValue =
+      error && typeof error === "object" && "code" in error
+        ? (error.code as GoogleAuthErrorCode)
+        : "token_invalid";
+    return finalize(
+      request,
+      mode,
+      errorPath(mode, failureCode(codeValue)),
+      pending
+    );
+  }
+
+  const result = await completeGoogleSignIn({
+    identity,
+    mode,
+    currentUser: mode === "link" ? await currentUser() : null,
+    findLink: findGoogleLink,
+    findUserLink: findGoogleLinkForUser,
+    createUser: createGoogleUser,
+    createLink: createGoogleLink,
+    touchLink: touchGoogleLink,
+    deleteLink: deleteGoogleLink,
+    deleteUser: deleteGoogleUser,
+    signInWithIdToken: async () => {
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: tokens.idToken,
+        access_token: tokens.accessToken ?? undefined,
+        nonce: transaction.nonce
+      });
+      if (error || !data.user) {
+        throw new Error("Supabase rejected the Google ID token");
+      }
+      return { userId: data.user.id };
+    },
+    signOut: async () => {
+      await supabase.auth.signOut();
+    }
+  });
+
+  if (!result.ok) {
+    const codeByReason: Record<typeof result.reason, string> = {
+      not_authenticated: "google_sign_in_required",
+      email_mismatch: "google_email_mismatch",
+      already_linked: "google_already_linked",
+      account_exists: "google_account_exists",
+      store_unavailable: "google_store_not_configured",
+      account_create_failed: "google_account_failed",
+      link_failed: "google_link_failed",
+      sign_in_failed: "google_sign_in_failed",
+      user_mismatch: "google_account_mismatch"
+    };
+    return finalize(
+      request,
+      mode,
+      errorPath(mode, codeByReason[result.reason]),
+      pending
+    );
+  }
+
+  return finalize(request, mode, successPath(mode), pending);
 }
