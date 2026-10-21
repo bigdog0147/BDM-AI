@@ -294,47 +294,88 @@
    decoration never intercepts a click.
    ========================================================================== */
 
-.welcome {
-  position: relative;
-}
-
-/* The field behind the greeting, bled past the block on purpose so the
-   column reads as one lit surface instead of a panel in a void. */
-.welcome::before {
-  content: "";
-  position: absolute;
-  left: -140px;
-  right: -140px;
-  top: -56px;
-  height: 460px;
-  background:
+/* Both decorations live on the scroll container's background.
+ *
+ * They used to be pseudo elements: an aurora on the welcome block and a
+ * horizon glow hanging 36vh below it. Absolute layers extend the scrollable
+ * area of their ancestor, which made an empty dashboard scroll and let the
+ * composer slice the suggestion cards — badly at short viewport heights.
+ * Backgrounds are painted inside the box, so they add exactly zero overflow
+ * at every size, and the two brand colours still read as one lit surface. */
+.chat-scroll {
+  background-image:
     radial-gradient(46% 58% at 20% 6%, rgba(21, 94, 239, 0.2), transparent 70%),
-    radial-gradient(38% 50% at 84% 20%, rgba(245, 196, 81, 0.13), transparent 72%);
-  pointer-events: none;
-  z-index: 0;
+    radial-gradient(38% 50% at 84% 20%, rgba(245, 196, 81, 0.13), transparent 72%),
+    radial-gradient(58% 42% at 50% 100%, rgba(21, 94, 239, 0.16), transparent 74%);
+  background-repeat: no-repeat;
+  background-attachment: scroll;
 }
 
-/* The glow that falls away below the cards. */
-.welcome::after {
-  content: "";
-  position: absolute;
-  left: -12%;
-  right: -12%;
-  top: 100%;
-  height: 36vh;
-  background: radial-gradient(
-    58% 100% at 50% 0%,
-    rgba(21, 94, 239, 0.15),
-    transparent 74%
-  );
-  pointer-events: none;
-  z-index: 0;
+/* Give every suggestion title the same two-line box, so the descriptions
+ * below them start on one shared baseline. "Understand a topic" wraps to two
+ * lines and used to drop its description 9px below the other three. */
+.suggestion-title {
+  min-height: 2.8em;
+  min-height: 2lh;
 }
 
-/* Keep the content above both layers. */
-.welcome > * {
-  position: relative;
-  z-index: 1;
+/* ----------------------------------------------------------------- empty state
+ *
+ * Centre the greeting in the column the way every chat surface does: the
+ * composer owns the bottom, so the hero sits in the optical middle instead of
+ * hugging the topbar and leaving a void underneath.
+ *
+ * `safe` keeps the top edge reachable when the hero is taller than the column
+ * (short windows, zoomed-in text). Browsers that do not understand the keyword
+ * drop the declaration and keep the original top alignment, so this cannot
+ * regress them. The `:has()` guard means a conversation still starts at the
+ * top — only the welcome-only state is centred. */
+.chat-inner:has(> .welcome) {
+  justify-content: safe center;
+  min-height: 100%;
+}
+
+/* Short windows: shrink the hero instead of letting the composer slice the
+ * cards. At 566px tall the column is ~352px and the full hero needs ~400px,
+ * so the emblem, spacing and copy are tightened until it fits. */
+@media (max-height: 700px) {
+  .welcome {
+    gap: 5px;
+  }
+
+  .welcome-title {
+    font-size: 22px;
+    letter-spacing: -0.01em;
+  }
+
+  .welcome-sub {
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .welcome-sub::after {
+    bottom: -9px;
+  }
+
+  .suggestions {
+    margin-top: 5px;
+  }
+
+  .suggestion {
+    padding: 8px 10px;
+  }
+
+  .suggestion-desc {
+    font-size: 11px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 /* The eyebrow carries the two brand colours. */
