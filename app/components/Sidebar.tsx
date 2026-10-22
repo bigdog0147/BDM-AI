@@ -82,6 +82,9 @@ export default function Sidebar({
   onOpenSaved,
   onOpenSettings,
   onOpenHelp,
+  onOpenTasks,
+  onOpenCapabilities,
+  onOpenApprovals,
   onSignOut
 }: {
   user: AuthUser;
@@ -99,6 +102,9 @@ export default function Sidebar({
   onOpenSaved: () => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
+  onOpenTasks: () => void;
+  onOpenCapabilities: () => void;
+  onOpenApprovals: () => void;
   onSignOut: () => void;
 }) {
   const [historyQuery, setHistoryQuery] = useState("");
@@ -200,6 +206,30 @@ export default function Sidebar({
               label="Saved items"
               onClick={() => {
                 onOpenSaved();
+                onCloseMobile();
+              }}
+            />
+            <NavItem
+              icon="history"
+              label="Tasks"
+              onClick={() => {
+                onOpenTasks();
+                onCloseMobile();
+              }}
+            />
+            <NavItem
+              icon="code"
+              label="Capabilities"
+              onClick={() => {
+                onOpenCapabilities();
+                onCloseMobile();
+              }}
+            />
+            <NavItem
+              icon="check"
+              label="Approvals"
+              onClick={() => {
+                onOpenApprovals();
                 onCloseMobile();
               }}
             />

@@ -33,6 +33,14 @@ services:
       # provider is auto-detected from the key that is present.
       - key: TAVILY_API_KEY
         sync: false
+      - key: SEARXNG_URL
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        sync: false
+      - key: OPENROUTER_IMAGE_MODEL
+        sync: false
+        sync: false
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY

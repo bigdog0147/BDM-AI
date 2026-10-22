@@ -73,15 +73,14 @@ export default function Welcome({
       <div className="welcome-mark">
         <BrandLogo variant="emblem" size={64} decorative />
       </div>
-      <p className="welcome-eyebrow">BDM Personal AI</p>
+      <p className="welcome-eyebrow">BDM — Personal AI</p>
       <h1 className="welcome-title">
         {greeting}
         {name ? <span className="welcome-name">, {name}</span> : null}
       </h1>
       <p className="welcome-sub">
-        Ask anything, speak a note, or send a question to the web. BDM keeps
-        your history, remembers what you ask it to remember, and always shows
-        its sources.
+        A private personal AI workspace with memory, voice notes and sourced web
+        research.
       </p>
 
       <div className="suggestions" role="list">

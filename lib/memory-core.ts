@@ -1,4 +1,4 @@
-import type { Memory, MemoryKind } from "./bdm-types";
+import type { Memory, MemoryKind, MemorySource, ValidationStatus } from "./bdm-types";
 
 /**
  * Pure memory logic: no database, no network, no environment.
@@ -286,4 +286,204 @@ export function clampImportance(value: unknown): number {
 
 export function isMemoryKind(value: unknown): value is MemoryKind {
   return typeof value === "string" && MEMORY_KINDS.includes(value as MemoryKind);
+}
+
+export function isMemorySource(value: unknown): value is MemorySource {
+  return typeof value === "string" && ["user_explicit", "inferred", "imported"].includes(value);
+}
+
+export function isValidationStatus(value: unknown): value is ValidationStatus {
+  return typeof value === "string" && ["unvalidated", "confirmed", "disputed", "stale"].includes(value);
+}
+
+/**
+ * Similarity threshold for considering two memories as potential duplicates.
+ * 0.8 = 80% token overlap of the shorter memory.
+ */
+const DUPLICATE_SIMILARITY_THRESHOLD = 0.8;
+
+/**
+ * Find groups of memories that are likely duplicates of each other.
+ * Returns arrays of memory IDs that should be merged.
+ * Only considers memories of the same kind and project scope.
+ */
+export function findDuplicateGroups(memories: Memory[]): string[][] {
+  const byKindAndProject = new Map<string, Memory[]>();
+
+  for (const memory of memories) {
+    const projectKey = typeof memory.metadata?.project === "string" ? memory.metadata.project : "global";
+    const key = `${memory.kind}:${projectKey}`;
+    if (!byKindAndProject.has(key)) byKindAndProject.set(key, []);
+    byKindAndProject.get(key)!.push(memory);
+  }
+
+  const groups: string[][] = [];
+
+  for (const [, bucket] of byKindAndProject) {
+    const processed = new Set<string>();
+
+    for (let i = 0; i < bucket.length; i++) {
+      const a = bucket[i];
+      if (processed.has(a.id)) continue;
+
+      const group = [a.id];
+      const aTokens = new Set(tokenize(a.content));
+
+      for (let j = i + 1; j < bucket.length; j++) {
+        const b = bucket[j];
+        if (processed.has(b.id)) continue;
+
+        const bTokens = new Set(tokenize(b.content));
+        const overlap = [...aTokens].filter((t) => bTokens.has(t)).length;
+        const shorter = Math.min(aTokens.size, bTokens.size);
+        if (shorter === 0) continue;
+
+        const similarity = overlap / shorter;
+        if (similarity >= DUPLICATE_SIMILARITY_THRESHOLD) {
+          group.push(b.id);
+          processed.add(b.id);
+        }
+      }
+
+      if (group.length > 1) {
+        groups.push(group);
+        group.forEach((id) => processed.add(id));
+      }
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * Detect contradictory memories within the same kind/project.
+ * Returns pairs of memory IDs that appear to contradict each other.
+ * Heuristic: same kind/project, high token overlap, but opposing sentiment
+ * words (prefer/hate, always/never, use/don't use, etc.).
+ */
+export function findContradictions(memories: Memory[]): Array<[string, string]> {
+  const byKindAndProject = new Map<string, Memory[]>();
+  const contradictions: Array<[string, string]> = [];
+
+  const oppositionPairs = [
+    ["prefer", "hate"],
+    ["prefer", "dislike"],
+    ["like", "hate"],
+    ["like", "dislike"],
+    ["always", "never"],
+    ["use", "avoid"],
+    ["use", "don't use"],
+    ["enable", "disable"],
+    ["enable", "turn off"],
+    ["yes", "no"],
+    ["true", "false"],
+    ["keep", "remove"],
+    ["add", "remove"],
+  ];
+
+  for (const memory of memories) {
+    const projectKey = typeof memory.metadata?.project === "string" ? memory.metadata.project : "global";
+    const key = `${memory.kind}:${projectKey}`;
+    if (!byKindAndProject.has(key)) byKindAndProject.set(key, []);
+    byKindAndProject.get(key)!.push(memory);
+  }
+
+  for (const [, bucket] of byKindAndProject) {
+    for (let i = 0; i < bucket.length; i++) {
+      for (let j = i + 1; j < bucket.length; j++) {
+        const a = bucket[i];
+        const b = bucket[j];
+        const aTokens = new Set(tokenize(a.content));
+        const bTokens = new Set(tokenize(b.content));
+        const overlap = [...aTokens].filter((t) => bTokens.has(t)).length;
+        const shorter = Math.min(aTokens.size, bTokens.size);
+        if (shorter === 0) continue;
+
+        // High overlap but check for opposition words
+        const similarity = overlap / shorter;
+        if (similarity < 0.5) continue;
+
+        const aLower = a.content.toLowerCase();
+        const bLower = b.content.toLowerCase();
+
+        for (const [pos, neg] of oppositionPairs) {
+          const aHasPos = aLower.includes(pos);
+          const aHasNeg = aLower.includes(neg);
+          const bHasPos = bLower.includes(pos);
+          const bHasNeg = bLower.includes(neg);
+
+          if ((aHasPos && bHasNeg) || (aHasNeg && bHasPos)) {
+            contradictions.push([a.id, b.id]);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return contradictions;
+}
+
+/**
+ * Compact a set of memories by summarizing older, low-importance facts
+ * while preserving pinned, goal, instruction, and project memories.
+ * Returns a new "summary" memory content and the IDs of memories to supersede.
+ */
+export function compactMemories(
+  memories: Memory[],
+  projectKey?: string | null,
+  options: { maxAgeDays?: number; minImportance?: number } = {}
+): { summaryContent: string; supersededIds: string[] } | null {
+  const maxAgeDays = options.maxAgeDays ?? 90;
+  const minImportance = options.minImportance ?? 30;
+  const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+
+  const candidates = memories.filter((m) => {
+    if (m.pinned) return false;
+    if (m.kind === "goal" || m.kind === "instruction" || m.kind === "project") return false;
+    if (projectKey && typeof m.metadata?.project === "string" && m.metadata.project !== projectKey) return false;
+    if (!projectKey && typeof m.metadata?.project === "string") return false; // only global
+    if (m.importance > minImportance) return false;
+    const updated = new Date(m.updated_at);
+    if (updated > cutoff) return false;
+    if (m.validation_status === "confirmed") return false;
+    return true;
+  });
+
+  if (candidates.length < 3) return null; // not worth compacting
+
+  // Build a concise summary
+  const byKind = new Map<string, Memory[]>();
+  for (const m of candidates) {
+    if (!byKind.has(m.kind)) byKind.set(m.kind, []);
+    byKind.get(m.kind)!.push(m);
+  }
+
+  const parts: string[] = [];
+  for (const [kind, list] of byKind) {
+    const themes = list.map((m) => m.content).join("; ");
+    parts.push(`${kind}: ${themes}`);
+  }
+
+  const summaryContent = `Summary (${candidates.length} older memories, ${maxAgeDays}+ days, importance ≤${minImportance}): ${parts.join(" | ")}`;
+  const supersededIds = candidates.map((m) => m.id);
+
+  return { summaryContent, supersededIds };
+}
+
+/**
+ * Determine the effective validation status of a memory based on its
+ * supersession chain and explicit validation.
+ */
+export function getEffectiveValidationStatus(memory: Memory): ValidationStatus {
+  if (memory.validation_status === "disputed") return "disputed";
+  if (memory.superseded_by) return "stale";
+  return memory.validation_status;
+}
+
+/**
+ * Check if a memory is currently active (not superseded, not disputed).
+ */
+export function isMemoryActive(memory: Memory): boolean {
+  return !memory.superseded_by && memory.validation_status !== "disputed";
 }

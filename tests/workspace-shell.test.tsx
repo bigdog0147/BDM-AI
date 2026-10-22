@@ -61,6 +61,9 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
     onOpenSaved: vi.fn(),
     onOpenSettings: vi.fn(),
     onOpenHelp: vi.fn(),
+    onOpenTasks: vi.fn(),
+    onOpenCapabilities: vi.fn(),
+    onOpenApprovals: vi.fn(),
     onSignOut: vi.fn(),
     ...overrides
   };

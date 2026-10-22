@@ -16,7 +16,7 @@
  * and cannot accidentally spend money.
  */
 
-export type Provider = "openai" | "ollama";
+export type Provider = "openai" | "ollama" | "openrouter";
 
 export type FailureKind =
   | "config"
@@ -87,6 +87,7 @@ export function resolveProvider(): Provider {
   // Default to Ollama so an unconfigured deployment never spends on OpenAI.
   if (!value || value === "ollama") return "ollama";
   if (value === "openai") return "openai";
+  if (value === "openrouter") return "openrouter";
   throw new ProviderConfigError(`Unknown AI_PROVIDER: ${value}`);
 }
 
@@ -94,7 +95,7 @@ export function resolveProvider(): Provider {
 export function resolveFallbackProvider(primary: Provider): Provider | null {
   const raw = process.env.AI_FALLBACK_PROVIDER?.trim().toLowerCase();
   if (!raw || raw === "none" || raw === "off") return null;
-  if (raw !== "openai" && raw !== "ollama") {
+  if (raw !== "openai" && raw !== "ollama" && raw !== "openrouter") {
     throw new ProviderConfigError(`Unknown AI_FALLBACK_PROVIDER: ${raw}`);
   }
   if (raw === primary) {
@@ -184,6 +185,29 @@ export function resolveOpenAITarget(): OpenAITarget {
   return { apiKey, model: resolveOpenAIModel() };
 }
 
+export interface OpenRouterTarget {
+  apiKey: string;
+  model: string;
+}
+
+export function resolveOpenRouterTarget(): OpenRouterTarget {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
+    throw new ProviderConfigError("OPENROUTER_API_KEY is not configured");
+  }
+  const model = process.env.OPENROUTER_MODEL?.trim() || "~openai/gpt-sol-latest";
+  return { apiKey, model };
+}
+
+export function resolveOpenRouterImageTarget(): { apiKey: string; model: string } {
+  const apiKey = process.env.OPENROUTER_IMAGE_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
+    throw new ProviderConfigError("OPENROUTER_API_KEY (or OPENROUTER_IMAGE_API_KEY) is not configured");
+  }
+  const model = process.env.OPENROUTER_IMAGE_MODEL?.trim() || "openai/gpt-5-image";
+  return { apiKey, model };
+}
+
 function assertCloudEndpoint(host: string): void {
   let url: URL;
   try {
@@ -240,6 +264,8 @@ export function resolveOllamaTarget(): OllamaTarget {
 export function assertProviderConfigured(provider: Provider): void {
   if (provider === "openai") {
     resolveOpenAITarget();
+  } else if (provider === "openrouter") {
+    resolveOpenRouterTarget();
   } else {
     resolveOllamaTarget();
   }
@@ -479,6 +505,72 @@ export async function callOpenAI(
   }
 }
 
+function classifyOpenRouterError(error: unknown): ProviderError {
+  const status = statusOf(error);
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : "";
+  if (name === "APIConnectionTimeoutError" || /timed out|timeout/i.test(message)) {
+    return new ProviderError("openrouter", "timeout", "openrouter timeout");
+  }
+  if (/connection error|fetch failed|ECONNREFUSED/i.test(message)) {
+    return new ProviderError("openrouter", "unreachable", "openrouter unreachable");
+  }
+  if (status === 401 || status === 403) {
+    return new ProviderError("openrouter", "auth", "openrouter unauthorized");
+  }
+  if (status === 429) {
+    return new ProviderError("openrouter", "rate_limit", "openrouter rate limited");
+  }
+  if (status !== null && status >= 500) {
+    return new ProviderError("openrouter", "server", `openrouter error ${status}`);
+  }
+  if (status !== null && status >= 400) {
+    return new ProviderError("openrouter", "bad_response", `openrouter error ${status}`);
+  }
+  return new ProviderError("openrouter", "bad_response", "openrouter failed");
+}
+
+export async function callOpenRouter(
+  args: GenerateArgs
+): Promise<{ text: string; model: string }> {
+  const { apiKey, model } = resolveOpenRouterTarget();
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: args.system },
+          { role: "user", content: args.user }
+        ],
+        max_tokens: MAX_OUTPUT_TOKENS
+      }),
+      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS)
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      const err = new Error(body || `openrouter ${response.status}`);
+      (err as unknown as { status?: number }).status = response.status;
+      throw err;
+    }
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = data.choices?.[0]?.message?.content?.trim();
+    if (!text) {
+      throw new ProviderError("openrouter", "bad_response", "openrouter empty response");
+    }
+    return { text, model };
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw classifyOpenRouterError(error);
+  }
+}
+
 function toProviderError(provider: Provider, error: unknown): ProviderError {
   if (error instanceof ProviderError) return error;
   if (error instanceof ProviderConfigError) {
@@ -496,6 +588,12 @@ function toProviderError(provider: Provider, error: unknown): ProviderError {
  * caller. Chat is a single JSON response (not a stream), so there is no
  * partially-delivered answer that could switch providers mid-flight.
  */
+function callProvider(provider: Provider, args: GenerateArgs): Promise<{ text: string; model: string }> {
+  if (provider === "openai") return callOpenAI(args);
+  if (provider === "openrouter") return callOpenRouter(args);
+  return callOllama(args);
+}
+
 export async function generateReply(
   args: GenerateArgs
 ): Promise<GenerateResult> {
@@ -520,8 +618,7 @@ export async function generateReply(
   }
 
   try {
-    const result =
-      primary === "openai" ? await callOpenAI(args) : await callOllama(args);
+    const result = await callProvider(primary, args);
     return { ...result, provider: primary };
   } catch (error) {
     const primaryError = toProviderError(primary, error);
@@ -532,8 +629,7 @@ export async function generateReply(
     let fallbackResult: { text: string; model: string };
     try {
       assertProviderConfigured(fallback);
-      fallbackResult =
-        fallback === "openai" ? await callOpenAI(args) : await callOllama(args);
+      fallbackResult = await callProvider(fallback, args);
     } catch (fallbackError) {
       const secondary = toProviderError(fallback, fallbackError);
       console.error("BDM AI fallback failed", fallback, secondary.kind);
@@ -580,6 +676,12 @@ function providerReady(provider: Provider): boolean {
       process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_MODEL?.trim()
     );
   }
+  if (provider === "openrouter") {
+    return Boolean(
+      process.env.OPENROUTER_API_KEY?.trim() &&
+        (process.env.OPENROUTER_MODEL?.trim() || "~openai/gpt-sol-latest")
+    );
+  }
   return ollamaReadiness().configured;
 }
 
@@ -613,6 +715,9 @@ export function aiStatus(): AIStatus {
   if (provider === "openai") {
     model = process.env.OPENAI_MODEL?.trim() || null;
     configured = providerReady("openai");
+  } else if (provider === "openrouter") {
+    model = process.env.OPENROUTER_MODEL?.trim() || "~openai/gpt-sol-latest";
+    configured = providerReady("openrouter");
   } else {
     const readiness = ollamaReadiness();
     model = readiness.model;

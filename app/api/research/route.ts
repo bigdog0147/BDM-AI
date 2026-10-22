@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generateReply } from "../../../lib/ai";
+import { generateReply, type Provider } from "../../../lib/ai";
 import { currentUser } from "../../../lib/auth";
 import { hashSubject } from "../../../lib/auth-email";
 import { safeError, safeErrorStatus, safeLogDetail } from "../../../lib/errors";
@@ -157,7 +157,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let answer: string;
   let model: string;
-  let provider: "ollama" | "openai";
+  let provider: Provider;
 
   try {
     const generated = await generateReply({

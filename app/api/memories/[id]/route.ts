@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../lib/auth";
-import { containsSecret, isMemoryKind } from "../../../../lib/memory-core";
+import { containsSecret, isMemoryKind, isMemorySource, isValidationStatus } from "../../../../lib/memory-core";
 import { deleteMemory, updateMemory } from "../../../../lib/memory-store";
 
 export const runtime = "nodejs";
@@ -26,7 +26,15 @@ export async function PATCH(
   }
 
   const payload = body as
-    | { content?: unknown; kind?: unknown; importance?: unknown; pinned?: unknown }
+    | {
+        content?: unknown;
+        kind?: unknown;
+        importance?: unknown;
+        pinned?: unknown;
+        confidence?: unknown;
+        source?: unknown;
+        validation_status?: unknown;
+      }
     | null;
 
   if (typeof payload?.content === "string" && containsSecret(payload.content)) {
@@ -38,13 +46,34 @@ export async function PATCH(
   if (payload?.kind !== undefined && !isMemoryKind(payload.kind)) {
     return NextResponse.json({ error: "Invalid memory kind" }, { status: 400 });
   }
+  if (payload?.confidence !== undefined) {
+    const conf = Number(payload.confidence);
+    if (!Number.isFinite(conf) || conf < 0 || conf > 100) {
+      return NextResponse.json({ error: "Confidence must be a number 0-100" }, { status: 400 });
+    }
+  }
+  if (payload?.source !== undefined && !isMemorySource(payload.source)) {
+    return NextResponse.json(
+      { error: "Invalid source. Must be: user_explicit, inferred, or imported" },
+      { status: 400 }
+    );
+  }
+  if (payload?.validation_status !== undefined && !isValidationStatus(payload.validation_status)) {
+    return NextResponse.json(
+      { error: "Invalid validation_status. Must be: unvalidated, confirmed, disputed, or stale" },
+      { status: 400 }
+    );
+  }
 
   const result = await updateMemory(user.id, id, {
     content: typeof payload?.content === "string" ? payload.content : undefined,
     kind: isMemoryKind(payload?.kind) ? payload.kind : undefined,
     importance:
       typeof payload?.importance === "number" ? payload.importance : undefined,
-    pinned: typeof payload?.pinned === "boolean" ? payload.pinned : undefined
+    pinned: typeof payload?.pinned === "boolean" ? payload.pinned : undefined,
+    confidence: typeof payload?.confidence === "number" ? payload.confidence : undefined,
+    source: isMemorySource(payload?.source) ? payload.source : undefined,
+    validation_status: isValidationStatus(payload?.validation_status) ? payload.validation_status : undefined
   });
 
   if (!result.ok) {

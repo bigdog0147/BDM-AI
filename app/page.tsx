@@ -20,6 +20,11 @@ import VoiceRecorder from "./components/VoiceRecorder";
 import { Icon, GoogleIcon } from "./components/Icons";
 import Markdown from "./components/Markdown";
 import Welcome from "./components/Welcome";
+import TaskDashboard from "./components/TaskDashboard";
+import CapabilitiesPanel from "./components/CapabilitiesPanel";
+import ApprovalQueue from "./components/ApprovalQueue";
+import TaskRecovery from "./components/TaskRecovery";
+import ProjectSelector from "./components/ProjectSelector";
 import type {
   AuthUser,
   CapabilityStatus,
@@ -73,6 +78,11 @@ export default function Home() {
   const [showEmail, setShowEmail] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
+  const [showCapabilities, setShowCapabilities] = useState(false);
+  const [showApprovals, setShowApprovals] = useState(false);
+  const [recoveryTaskId, setRecoveryTaskId] = useState<string | null>(null);
+  const [currentProject, setCurrentProject] = useState<string | null>(null);
 
   const sendingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -423,6 +433,18 @@ export default function Home() {
           setShowHelp(true);
           setMobileOpen(false);
         }}
+        onOpenTasks={() => {
+          setShowTasks(true);
+          setMobileOpen(false);
+        }}
+        onOpenCapabilities={() => {
+          setShowCapabilities(true);
+          setMobileOpen(false);
+        }}
+        onOpenApprovals={() => {
+          setShowApprovals(true);
+          setMobileOpen(false);
+        }}
         onSignOut={() => void signOut()}
       />
 
@@ -448,6 +470,10 @@ export default function Home() {
           </div>
 
           <div className="topbar-actions">
+            <ProjectSelector
+              currentProject={currentProject}
+              onChange={setCurrentProject}
+            />
             <Link
               href="/settings"
               className="icon-btn"
@@ -841,6 +867,28 @@ export default function Home() {
           </div>
         </div>
       </Modal>
+
+      <TaskDashboard
+        open={showTasks}
+        onClose={() => setShowTasks(false)}
+        projectKey={currentProject}
+      />
+
+      <CapabilitiesPanel
+        open={showCapabilities}
+        onClose={() => setShowCapabilities(false)}
+      />
+
+      <ApprovalQueue
+        open={showApprovals}
+        onClose={() => setShowApprovals(false)}
+      />
+
+      <TaskRecovery
+        open={!!recoveryTaskId}
+        onClose={() => setRecoveryTaskId(null)}
+        taskId={recoveryTaskId ?? ""}
+      />
     </div>
   );
 }

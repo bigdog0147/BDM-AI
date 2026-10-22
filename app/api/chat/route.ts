@@ -1,6 +1,6 @@
 import { SYSTEM_PROMPT } from "../../../lib/prompt";
 import { persistTurn } from "../../../lib/persist";
-import { generateReply } from "../../../lib/ai";
+import { generateReply, type Provider } from "../../../lib/ai";
 import { safeError, safeLogDetail } from "../../../lib/errors";
 import { currentUser } from "../../../lib/auth";
 import {
@@ -43,7 +43,7 @@ function rateLimited(key: string): boolean {
 export type MemoryAction =
   | {
       type: "saved";
-      memory: { id: string; content: string; kind: string };
+      memory: { id: string; content: string; kind: string; confidence: number; source: string };
     }
   | { type: "forgotten"; count: number; contents: string[]; ids: string[] }
   | { type: "blocked_secret" }
@@ -131,7 +131,9 @@ export async function POST(request: Request): Promise<Response> {
               memory: {
                 id: result.memory.id,
                 content: result.memory.content,
-                kind: result.memory.kind
+                kind: result.memory.kind,
+                confidence: result.memory.confidence,
+                source: result.memory.source
               }
             };
             confirmation = `Saved to memory as a ${result.memory.kind}: "${result.memory.content}"`;
@@ -180,7 +182,7 @@ export async function POST(request: Request): Promise<Response> {
     // ---- generate --------------------------------------------------------
     let text: string;
     let model: string;
-    let provider: "ollama" | "openai";
+    let provider: Provider;
     let memoriesUsed: { id: string; content: string; kind: string }[] = [];
 
     if (confirmation) {

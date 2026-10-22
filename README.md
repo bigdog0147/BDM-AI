@@ -1,6 +1,10 @@
-# BDM AI
+# BDM — Personal AI
 
-BDM is a standalone personal AI platform designed to become a continuously upgradeable assistant with memory, internet research, tools, voice, files, automation, and mobile applications.
+> A private personal AI workspace with memory, voice notes and sourced web research.
+
+Private by default. Voice notes are transcribed and discarded, and research shows the sources behind every claim.
+
+Enter sends · Shift+Enter for a new line
 
 ## V1 foundation
 

@@ -7,6 +7,11 @@ type Memory = {
   kind: string;
   content: string;
   importance: number;
+  confidence: number;
+  source: string;
+  validation_status: string;
+  superseded_by: string | null;
+  superseded_at: string | null;
   pinned: boolean;
   metadata?: Record<string, unknown>;
   created_at?: string;
@@ -158,6 +163,31 @@ export default function MemoryPanel({
     }
   }
 
+  async function validateMemory(id: string, currentStatus: string) {
+    const newStatus = currentStatus === "confirmed" ? "unvalidated" : "confirmed";
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/memories/validate/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = (await response.json()) as { memory?: Memory; error?: string };
+      if (!response.ok || !data.memory) {
+        throw new Error(data.error || "Could not update validation status");
+      }
+      const updated = data.memory;
+      setMemories((current) =>
+        current.map((entry) => (entry.id === id ? updated : entry))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update validation status");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function clearAll() {
     if (
       !window.confirm(
@@ -197,6 +227,57 @@ export default function MemoryPanel({
       setError(
         err instanceof Error ? err.message : "Could not clear conversation history"
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function scanDuplicates() {
+    setSaving(true);
+    setError(null);
+    try {
+      const project = ""; // could add project filter later
+      const response = await fetch(`/api/memories/deduplicate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not scan duplicates");
+      if (data.count === 0) {
+        setError("No duplicate groups found");
+      } else {
+        setError(`Found ${data.count} potential duplicate group(s). Review and merge manually.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not scan duplicates");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function compactMemories() {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/memories/compact`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project: "", execute: false })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not preview compaction");
+      if (!data.preview) {
+        setError("Not enough memories to compact");
+      } else {
+        // Store preview for confirmation
+        setError(
+          `Preview: would compact ${data.preview.supersededIds.length} memories. ` +
+          `Confirm to execute? (Run again with execute=true to confirm)`
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not preview compaction");
     } finally {
       setSaving(false);
     }
@@ -296,6 +377,31 @@ export default function MemoryPanel({
               ) : (
                 <>
                   <p className="memory-content">{memory.content}</p>
+                  <div className="memory-meta-extended">
+                    <span className="badge confidence" title="Confidence score">
+                      {memory.confidence ?? 80}%
+                    </span>
+                    <span className="badge source" title={`Source: ${memory.source}`}>
+                      {memory.source ?? "user_explicit"}
+                    </span>
+                    <span className={`badge validation ${memory.validation_status}`} title="Validation status">
+                      {memory.validation_status ?? "unvalidated"}
+                    </span>
+                    {memory.superseded_by && (
+                      <span className="badge superseded" title="This memory has been superseded">
+                        → superseded
+                      </span>
+                    )}
+                    {memory.superseded_at && (
+                      <span className="badge superseded-at" title="Superseded at">
+                        {new Date(memory.superseded_at).toLocaleDateString()}
+                      </span>
+                    )}
+                    {typeof memory.metadata?.project === "string" && (
+                      <span className="badge project">{memory.metadata.project}</span>
+                    )}
+                    {memory.pinned && <span className="badge pin">pinned</span>}
+                  </div>
                   <div className="memory-actions">
                     <button
                       type="button"
@@ -319,6 +425,14 @@ export default function MemoryPanel({
                     </button>
                     <button
                       type="button"
+                      className="ghost"
+                      onClick={() => void validateMemory(memory.id, memory.validation_status)}
+                      disabled={saving}
+                    >
+                      {memory.validation_status === "confirmed" ? "Unconfirm" : "Confirm"}
+                    </button>
+                    <button
+                      type="button"
                       className="ghost danger"
                       onClick={() => void remove(memory.id)}
                       disabled={saving}
@@ -334,6 +448,24 @@ export default function MemoryPanel({
 
         {!signedOut && (
           <footer className="drawer-foot">
+            <div className="footer-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => void scanDuplicates()}
+                disabled={saving}
+              >
+                Scan for Duplicates
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => void compactMemories()}
+                disabled={saving}
+              >
+                Compact Memories
+              </button>
+            </div>
             {memories.length > 0 && (
               <button
                 type="button"
