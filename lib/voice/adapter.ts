@@ -36,7 +36,8 @@ export class VoiceAdapter {
   async speechToText(buffer: Buffer, mimeType = 'audio/mp3') {
     if (!this.isConfigured()) throw new Error('ELEVENLABS_API_KEY missing');
     const form = new FormData();
-    form.append('file', new Blob([buffer]), 'recording.mp3');
+    const audioBytes = Uint8Array.from(buffer).buffer;
+    form.append('file', new Blob([audioBytes]), 'recording.mp3');
     const res = await fetch(`${BASE_URL}/speech-to-text`, {
       method: 'POST',
       headers: { 'xi-api-key': this.key },

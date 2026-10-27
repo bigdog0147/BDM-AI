@@ -4,6 +4,7 @@
  */
 
 import type { MemoryEntry, MemoryQuery, ProjectContext, MemoryStats } from './types';
+import { createSupabaseServiceClient } from '@/lib/supabase';
 
 export interface MemoryManagerConfig {
   maxEntriesPerProject: number;
@@ -170,10 +171,52 @@ export class MemoryManager {
   }
 
   /**
-   * Delete a memory entry
+   * Persist a memory entry to Supabase (minimal DB integration)
+   * Wired lazily via optional persistence. Currently passes through; agents
+   * may call persistMemory after storeMemory for durable storage.
+   */
+  async persistMemory(entry: MemoryEntry): Promise<boolean> {
+    try {
+      const supabase = createSupabaseServiceClient();
+      const { error } = await supabase.from("bdm_memories").upsert({
+        id: entry.id,
+        user_id: entry.ownerId || "anonymous",
+        content: JSON.stringify(entry.content),
+        metadata: entry.tags ? { tags: entry.tags } : {},
+        updated_at: entry.updatedAt.toISOString(),
+      }, { onConflict: "id" });
+      return !error;
+    } catch { return false; }
+  }
+
+  /**
+   * Load a memory entry from Supabase
+   */
+  async loadMemory(entryId: string): Promise<MemoryEntry | null> {
+    try {
+      const supabase = createSupabaseServiceClient();
+      const { data, error } = await supabase.from("bdm_memories").select("*").eq("id", entryId).single();
+      if (error || !data) return null;
+      return { ...data, content: JSON.parse(data.content as string), updatedAt: new Date(data.updated_at) } as MemoryEntry;
+    } catch { return null; }
+  }
+
+  /**
+   * Delete a memory entry (in-memory)
    */
   deleteMemory(entryId: string): boolean {
     return this.store.entries.delete(entryId);
+  }
+
+  /**
+   * Delete memory from Supabase
+   */
+  async deleteMemoryDB(entryId: string): Promise<boolean> {
+    try {
+      const supabase = createSupabaseServiceClient();
+      const { error } = await supabase.from("bdm_memories").delete().eq("id", entryId);
+      return !error;
+    } catch { return false; }
   }
 
   /**

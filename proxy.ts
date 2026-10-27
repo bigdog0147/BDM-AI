@@ -35,8 +35,11 @@ export async function proxy(request: NextRequest) {
     }
   });
 
-  // Touch the session so expired tokens are refreshed and cookies updated.
-  await supabase.auth.getUser();
+  // Call getClaims early so lazy session init + refresh completes
+  // before the response is committed, allowing cookie writes.
+  // Prevent CDN/proxy caching of auth responses (required for cookie writes)
+  response.headers.set('Cache-Control', 'private, no-store');
+  await supabase.auth.getClaims();
 
   return response;
 }

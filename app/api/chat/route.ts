@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 import { getProvider, initializeProviders, type ProviderType, isProviderError, type ChatMessage } from '@/lib/providers';
 import { getMasterAgent } from '@/lib/agents';
 import { registerBuiltinAgents } from '@/lib/agents';
@@ -40,16 +41,28 @@ function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 }
 
-function generateUserId(request: NextRequest): string {
-  // In production, extract from auth token
-  // For now, generate a valid UUID for anonymous users
+async function generateUserId(request: NextRequest): Promise<string> {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    if (url && key) {
+      const supabase = createServerClient(url, key, {
+        cookies: {
+          getAll() { return request.cookies.getAll(); },
+          setAll() {},
+        },
+      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) return session.user.id;
+    }
+  } catch { /* ignore */ }
   return crypto.randomUUID();
 }
 
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   const clientIp = getClientIp(request);
-  const userId = generateUserId(request);
+  const userId = await generateUserId(request);
   const startTime = Date.now();
 
   try {

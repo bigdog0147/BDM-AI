@@ -64,7 +64,7 @@ export async function createConversation(
   
   const { data, error } = await supabaseAdmin
     .from("bdm_conversations")
-    .insert({ user_id: anonUserId, title })
+    .insert({ user_id: userId, title })
     .select()
     .single();
 

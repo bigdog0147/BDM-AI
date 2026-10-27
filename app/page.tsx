@@ -58,7 +58,7 @@ export default function Home() {
         <div className="status"><span /> Core online</div>
       </header>
 
-      <section className="chat">
+      <section className="chat" aria-label="Conversation" aria-live="polite" role="region">
         {messages.map((message, index) => (
           <article key={index} className={`message ${message.role}`}>
             <div className="label">{message.role === "assistant" ? "BDM" : "You"}</div>
@@ -70,12 +70,13 @@ export default function Home() {
 
       <form className="composer" onSubmit={submit}>
         <textarea
+          aria-label="Message input"
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask BDM anything…"
           rows={2}
         />
-        <button type="submit" disabled={busy || !input.trim()}>Send</button>
+        <button aria-label="Send message" type="submit" disabled={busy || !input.trim()}>Send</button>
       </form>
     </main>
   );
