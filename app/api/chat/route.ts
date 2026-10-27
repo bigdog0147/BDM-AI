@@ -9,6 +9,7 @@ import { createServerClient } from '@supabase/ssr';
 import { getProvider, initializeProviders, type ProviderType, isProviderError, type ChatMessage } from '@/lib/providers';
 import { getMasterAgent } from '@/lib/agents';
 import { registerBuiltinAgents } from '@/lib/agents';
+import { retrieveRelevantMemories } from '@/lib/memory-store';
 import { 
   getOrCreateSessionConversation, 
   addMessage, 
@@ -107,6 +108,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Best-effort retrieval of relevant memories for this turn. Non-blocking;
+    // failures degrade gracefully so chat never breaks because storage is down.
+    let memoryContext = "";
+    try {
+      const memories = await retrieveRelevantMemories(userId, message, {
+        project: projectId === 'default' ? null : projectId,
+      });
+      if (memories.length > 0) {
+        memoryContext = memories.map((m) => `- [${m.kind}] ${m.content.slice(0, 300)}`).join("\n");
+      }
+    } catch { /* memory retrieval is best-effort */ }
+
     // Validate provider availability (for direct mode fallback)
     let provider;
     try {
@@ -154,11 +167,13 @@ export async function POST(request: NextRequest) {
       console.error("Failed to load conversation history:", error);
     }
 
-    // Process through MasterAgent with conversation context
+    // Process through MasterAgent with conversation context and memory context
     const result = await masterAgent.processRequest({
       requestId,
+      userId,
       projectId,
       message: message.trim(),
+      context: memoryContext ? { memoryContext } : undefined,
       options: {
         useOrchestration,
         preferredProvider: providerType,

@@ -3,7 +3,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'jsdom',
-    include: ['__tests__/**/*.test.{ts,tsx}'],
+    include: [
+      '__tests__/**/*.test.{ts,tsx}',
+      'tests/**/*.test.{ts,tsx}',
+    ],
     exclude: ['node_modules/', '.next/', 'BDM-AI-starter/'],
     coverage: {
       provider: 'v8',
