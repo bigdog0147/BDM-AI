@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@rollup/rollup-win32-x64-msvc": "4.64.9",
+    "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.118.0",
     "next": "16.3.3",
     "openai": "7.5.0",

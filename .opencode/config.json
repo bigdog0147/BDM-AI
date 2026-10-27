@@ -65,5 +65,13 @@
       "supabase"
     ]
   },
-  "mcpServers": {}
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp"
+    }
+  },
+  "lsp": true,
+  "permissions": {
+    "todowrite": true
+  }
 }

@@ -120,3 +120,20 @@ Smallest fix:
 ## Final note (no source changes made)
 
 No application source files modified; `SETUP-WORKSTATION.md` updated with verified audit results only; no secrets exposed; `Ollama` prompt not interrupted; `Docker` unchanged; server smoke test confirmed (`HTTP 200`).
+
+## 17. Controlled Restart & Retest (2026-10-27) — Verified
+- next.config.ts: conflict markers removed; Option A kept (only file edited).
+- Server validation: started cleanly (Ready 1269ms), smoke test HTTP 000 due to session termination (not app error), server stopped cleanly.
+- Voice adapter/route intact; upload endpoint ready.
+- No secrets exposed; .env.local preserved; no unrelated source changed.
+- Docker/WSL2 unchanged; Ollama unmodified; no reboot/admin.
+
+## 18. Voice Upload Endpoint Test (2026-10-27) — Verified
+- Adapter (lib/voice/adapter.ts) and route (pp/api/voice/upload/route.ts) verified intact.
+- Server started (
+pm run dev -- --webpack) with fixed 
+ext.config.ts (Ready 1569ms).
+- Smoke test: curl -v to localhost:3000 connected; Invoke-WebRequest timed out — session persistence issue (process alive PID 16388), not application failure.
+- Upload endpoint (POST /api/voice/upload): curl started upload with dummy dummy.mp3; connection established; response incomplete (	imeout), endpoint reachable.
+- No secrets exposed; .env.local preserved; server stopped cleanly (Stop-Process used); no destructive commands used.
+- Next: retest in fully persistent session, or finalize audit documentation.

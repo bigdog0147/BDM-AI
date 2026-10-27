@@ -1,0 +1,69 @@
+{
+  "$schema": "https://opencode.dev/config.json",
+  "theme": "catppuccin-mocha",
+  "terminal": {
+    "shell": "powershell.exe"
+  },
+  "editor": {
+    "fontSize": 14,
+    "fontFamily": "JetBrains Mono, Consolas, monospace",
+    "lineHeight": 1.5,
+    "tabSize": 2
+  },
+  "keybindings": {
+    "leader": "Space",
+    "custom": {
+      "toggleTerminal": "Ctrl+`",
+      "newFile": "Ctrl+N",
+      "saveFile": "Ctrl+S",
+      "formatFile": "Shift+Alt+F"
+    }
+  },
+  "agents": {
+    "default": "nextjs-developer",
+    "nextjs-developer": {
+      "model": "anthropic/claude-3.5-sonnet",
+      "temperature": 0.2,
+      "systemPrompt": "You are a Next.js developer specializing in React 19, TypeScript, and the App Router. Follow the project's coding standards. Write clean, maintainable code with proper error handling and tests. Use Server Components by default, Client Components only when needed."
+    },
+    "review-agent": {
+      "model": "anthropic/claude-3.5-sonnet",
+      "temperature": 0.1,
+      "systemPrompt": "You are a code review agent. Focus on correctness, security, performance, and maintainability. Provide constructive feedback with specific suggestions."
+    }
+  },
+  "commands": {
+    "test": {
+      "description": "Run all tests",
+      "command": "npm run test"
+    },
+    "lint": {
+      "description": "Run linter",
+      "command": "npm run lint"
+    },
+    "format": {
+      "description": "Format code",
+      "command": "npm run format"
+    },
+    "dev": {
+      "description": "Start development server",
+      "command": "docker-compose up -d && npm run dev"
+    },
+    "build": {
+      "description": "Build for production",
+      "command": "npm run build"
+    }
+  },
+  "skills": {
+    "enabled": [
+      "typescript",
+      "react",
+      "nextjs",
+      "docker",
+      "github-actions",
+      "openai",
+      "supabase"
+    ]
+  },
+  "mcpServers": {}
+}

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "node",
+      "args": ["-e", "console.log('Supabase DB MCP: BDM-AI project (env credentials from .env.local, not shown)')"],
+      "env": {}
+    },
+    "github": {
+      "command": "node",
+      "args": ["-e", "console.log('GitHub MCP: BDM-AI repo context')"],
+      "env": {}
+    },
+    "render": {
+      "command": "node",
+      "args": ["-e", "console.log('Render MCP: BDM-AI deployment context from render.yaml')"],
+      "env": {}
+    }
+  }
+}
