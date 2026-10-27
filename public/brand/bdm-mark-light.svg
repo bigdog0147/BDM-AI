@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 72" fill="none" role="img" aria-labelledby="bdmMarkLightTitle bdmMarkLightDesc">
+  <title id="bdmMarkLightTitle">BDM Personal AI monogram for light surfaces</title>
+  <desc id="bdmMarkLightDesc">A navy and bronze BDM monogram with a sweeping bronze arc.</desc>
+  <defs>
+    <linearGradient id="ltGold" x1="14" y1="20" x2="74" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C79A2E"/>
+      <stop offset=".5" stop-color="#A97C1F"/>
+      <stop offset="1" stop-color="#8A651C"/>
+    </linearGradient>
+    <linearGradient id="ltEdge" x1="14" y1="20" x2="74" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6B4E12"/>
+      <stop offset="1" stop-color="#4A3609"/>
+    </linearGradient>
+    <g id="bdmMonoLight" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 26v28"/>
+      <path d="M18 26h6.5a5.4 5.4 0 0 1 0 10.8H18"/>
+      <path d="M18 37.2h7.5a6 6 0 0 1 0 12H18"/>
+      <path d="M40 26v28"/>
+      <path d="M40 26h3a14 14 0 0 1 0 28h-3"/>
+      <path d="M59 54V26l6 9.5 6-9.5v28"/>
+    </g>
+  </defs>
+
+  <path d="M6 50C6 24 26 7 52 6" stroke="url(#ltGold)" stroke-width="1.8" opacity=".8" stroke-linecap="round"/>
+  <g fill="#8A651C">
+    <circle cx="6" cy="50" r="2.2"/>
+    <circle cx="52" cy="6" r="1.8"/>
+  </g>
+
+  <use href="#bdmMonoLight" stroke="url(#ltEdge)" stroke-width="6.6" transform="translate(.8,1.7)"/>
+  <use href="#bdmMonoLight" stroke="url(#ltGold)" stroke-width="5.4"/>
+  <use href="#bdmMonoLight" stroke="#0B1B3A" stroke-width="1.2" transform="translate(-.7,-1)" opacity=".5"/>
+</svg>

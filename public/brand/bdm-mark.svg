@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 72" fill="none" role="img" aria-labelledby="bdmMarkTitle bdmMarkDesc">
+  <title id="bdmMarkTitle">BDM Personal AI monogram</title>
+  <desc id="bdmMarkDesc">A metallic gold BDM monogram with a sweeping gold arc and glowing nodes.</desc>
+  <defs>
+    <linearGradient id="mkGold" x1="14" y1="20" x2="74" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF6D4"/>
+      <stop offset=".24" stop-color="#F7CE62"/>
+      <stop offset=".5" stop-color="#D7A63A"/>
+      <stop offset=".74" stop-color="#B8871F"/>
+      <stop offset="1" stop-color="#F2C558"/>
+    </linearGradient>
+    <linearGradient id="mkEdge" x1="14" y1="20" x2="74" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8A651C"/>
+      <stop offset=".5" stop-color="#5A400C"/>
+      <stop offset="1" stop-color="#8A651C"/>
+    </linearGradient>
+    <linearGradient id="mkSheen" x1="16" y1="22" x2="58" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFDF0"/>
+      <stop offset="1" stop-color="#F3C75C"/>
+    </linearGradient>
+    <filter id="mkGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <g id="bdmMono" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 26v28"/>
+      <path d="M18 26h6.5a5.4 5.4 0 0 1 0 10.8H18"/>
+      <path d="M18 37.2h7.5a6 6 0 0 1 0 12H18"/>
+      <path d="M40 26v28"/>
+      <path d="M40 26h3a14 14 0 0 1 0 28h-3"/>
+      <path d="M59 54V26l6 9.5 6-9.5v28"/>
+    </g>
+  </defs>
+
+  <path d="M6 50C6 24 26 7 52 6" stroke="url(#mkGold)" stroke-width="1.8" opacity=".65" stroke-linecap="round"/>
+  <g fill="#F5C451" filter="url(#mkGlow)">
+    <circle cx="6" cy="50" r="2.2"/>
+    <circle cx="52" cy="6" r="1.8"/>
+  </g>
+
+  <use href="#bdmMono" stroke="url(#mkEdge)" stroke-width="6.6" transform="translate(.8,1.7)"/>
+  <use href="#bdmMono" stroke="url(#mkGold)" stroke-width="5.4"/>
+  <use href="#bdmMono" stroke="url(#mkSheen)" stroke-width="1.4" transform="translate(-.7,-1)" opacity=".75"/>
+</svg>

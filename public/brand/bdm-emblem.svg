@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" role="img" aria-labelledby="bdmEmblemTitle bdmEmblemDesc">
+  <title id="bdmEmblemTitle">BDM Personal AI emblem</title>
+  <desc id="bdmEmblemDesc">A gold metallic B monogram inside a gold ring, with a brain motif, a circuit chip and glowing nodes.</desc>
+  <defs>
+    <linearGradient id="embGold" x1="46" y1="40" x2="196" y2="206" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF6D4"/>
+      <stop offset=".22" stop-color="#F7CE62"/>
+      <stop offset=".48" stop-color="#D7A63A"/>
+      <stop offset=".72" stop-color="#B8871F"/>
+      <stop offset="1" stop-color="#F2C558"/>
+    </linearGradient>
+    <linearGradient id="embGoldEdge" x1="46" y1="40" x2="196" y2="206" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8A651C"/>
+      <stop offset=".5" stop-color="#5E420D"/>
+      <stop offset="1" stop-color="#8A651C"/>
+    </linearGradient>
+    <linearGradient id="embSheen" x1="70" y1="52" x2="170" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFDF0"/>
+      <stop offset="1" stop-color="#F3C75C"/>
+    </linearGradient>
+    <radialGradient id="embDeep" cx="0" cy="0" r="1" gradientTransform="translate(96 92) rotate(52) scale(74)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#155EEF" stop-opacity=".55"/>
+      <stop offset=".45" stop-color="#123066"/>
+      <stop offset=".75" stop-color="#0A1B3A"/>
+      <stop offset="1" stop-color="#050B1C"/>
+    </radialGradient>
+    <filter id="embGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="embSoft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <!-- deep disc -->
+  <circle cx="120" cy="120" r="106" fill="url(#embDeep)"/>
+
+  <!-- glow behind the ring -->
+  <circle cx="120" cy="120" r="112" stroke="#F5C451" stroke-width="10" opacity=".22" filter="url(#embSoft)"/>
+
+  <!-- outer metallic ring -->
+  <circle cx="120" cy="120" r="112" stroke="url(#embGoldEdge)" stroke-width="9"/>
+  <circle cx="120" cy="120" r="112" stroke="url(#embGold)" stroke-width="6"/>
+  <circle cx="120" cy="120" r="104" stroke="#F5C451" stroke-width="1" opacity=".35"/>
+  <path d="M120 8 A112 112 0 0 1 232 120" stroke="url(#embSheen)" stroke-width="2" opacity=".8" stroke-linecap="round"/>
+
+  <!-- circuit traces -->
+  <g stroke="#3287FF" stroke-width="1.6" stroke-linecap="round" opacity=".85">
+    <path d="M74 78h-14a6 6 0 0 0-6 6v10"/>
+    <path d="M74 150h-18a6 6 0 0 0-6 6v8"/>
+    <path d="M166 100h16a6 6 0 0 1 6 6v6"/>
+    <path d="M166 160h14a6 6 0 0 1 6 6v4"/>
+  </g>
+  <g fill="#5FA0FF" filter="url(#embGlow)">
+    <circle cx="54" cy="94" r="3"/>
+    <circle cx="50" cy="164" r="3"/>
+    <circle cx="188" cy="112" r="3"/>
+    <circle cx="186" cy="170" r="3"/>
+  </g>
+
+  <!-- metallic B -->
+  <path
+    fill="url(#embGold)"
+    fill-rule="evenodd"
+    d="M62 58 H118 C148 58 166 74 166 98 C166 115 156 127 140 133 C160 139 171 152 171 171 C171 197 149 212 117 212 H62 Z M93 86 H115 C126 86 133 91 133 100 C133 109 126 114 115 114 H93 Z M93 142 H119 C131 142 138 147 138 158 C138 169 131 174 119 174 H93 Z"/>
+  <path
+    fill="none"
+    stroke="url(#embGoldEdge)"
+    stroke-width="2.5"
+    stroke-linejoin="round"
+    d="M62 58 H118 C148 58 166 74 166 98 C166 115 156 127 140 133 C160 139 171 152 171 171 C171 197 149 212 117 212 H62 Z M93 86 H115 C126 86 133 91 133 100 C133 109 126 114 115 114 H93 Z M93 142 H119 C131 142 138 147 138 158 C138 169 131 174 119 174 H93 Z"/>
+  <path
+    fill="none"
+    stroke="url(#embSheen)"
+    stroke-width="1.6"
+    stroke-linejoin="round"
+    opacity=".85"
+    d="M66 62 H118 C145 62 161 76 161 98 C161 113 152 124 137 130"/>
+  <path d="M66 66 V206" stroke="url(#embSheen)" stroke-width="1.8" opacity=".7" stroke-linecap="round"/>
+
+  <!-- brain motif -->
+  <g>
+    <path
+      d="M96 96c-7 0-11 5-10 11-6 2-7 10-2 14-1 6 3 11 9 11 2 4 7 5 11 2 4 3 9 1 10-4 5-1 7-6 5-11 3-4 1-10-4-12 0-6-6-11-12-11-2-2-5-2-7 0Z"
+      fill="url(#embDeep)"
+      stroke="url(#embGold)"
+      stroke-width="2.2"
+      stroke-linejoin="round"/>
+    <g stroke="#F5C451" stroke-width="1.5" stroke-linecap="round" opacity=".9">
+      <path d="M104 96c0 5-3 8-8 8"/>
+      <path d="M104 104c4 0 7 3 7 7"/>
+      <path d="M98 112c0 4-3 7-7 7"/>
+    </g>
+  </g>
+
+  <!-- circuit chip -->
+  <g>
+    <rect x="104" y="146" width="26" height="26" rx="5" fill="url(#embDeep)" stroke="url(#embGold)" stroke-width="2.2"/>
+    <rect x="112" y="154" width="10" height="10" rx="2" fill="#155EEF" opacity=".85"/>
+    <g stroke="url(#embGold)" stroke-width="1.8" stroke-linecap="round">
+      <path d="M110 146v-6M117 146v-6M124 146v-6M131 146v-6"/>
+      <path d="M110 172v6M117 172v6M124 172v6M131 172v6"/>
+      <path d="M104 152h-6M104 159h-6M104 166h-6M130 152h6M130 159h6M130 166h6"/>
+    </g>
+  </g>
+
+  <!-- ring nodes -->
+  <g fill="#F5C451" filter="url(#embGlow)">
+    <circle cx="120" cy="8" r="4"/>
+    <circle cx="28" cy="120" r="3.4"/>
+    <circle cx="212" cy="120" r="3.4"/>
+  </g>
+</svg>

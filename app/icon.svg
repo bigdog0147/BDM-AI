@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="bdmIconTitle bdmIconDesc">
+  <title id="bdmIconTitle">BDM Personal AI</title>
+  <desc id="bdmIconDesc">The BDM emblem: a gold ring around a metallic B on a midnight navy tile.</desc>
+  <defs>
+    <linearGradient id="icGold" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF6D4"/>
+      <stop offset=".3" stop-color="#F5C451"/>
+      <stop offset=".66" stop-color="#B8871F"/>
+      <stop offset="1" stop-color="#F2C558"/>
+    </linearGradient>
+    <linearGradient id="icEdge" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8A651C"/>
+      <stop offset="1" stop-color="#5A400C"/>
+    </linearGradient>
+    <radialGradient id="icDeep" cx="0" cy="0" r="1" gradientTransform="translate(24 22) rotate(52) scale(30)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#123066"/>
+      <stop offset="1" stop-color="#050B1C"/>
+    </radialGradient>
+    <g id="icB" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 15v34"/>
+      <path d="M20 15h9a8 8 0 0 1 0 16h-9"/>
+      <path d="M20 31h10a9 9 0 0 1 0 18H20"/>
+    </g>
+  </defs>
+
+  <rect width="64" height="64" rx="15" fill="#050B1C"/>
+  <circle cx="32" cy="32" r="25" stroke="url(#icGold)" stroke-width="2.6"/>
+  <circle cx="32" cy="32" r="22" stroke="#F5C451" stroke-width=".8" opacity=".3"/>
+  <use href="#icB" stroke="url(#icEdge)" stroke-width="8" transform="translate(.6,1)"/>
+  <use href="#icB" stroke="url(#icGold)" stroke-width="6.4"/>
+  <use href="#icB" stroke="#FFF3CE" stroke-width="1.4" transform="translate(-.5,-.7)" opacity=".6"/>
+  <g fill="#F5C451">
+    <circle cx="32" cy="7" r="1.6"/>
+    <circle cx="9" cy="32" r="1.4"/>
+    <circle cx="55" cy="32" r="1.4"/>
+  </g>
+</svg>
