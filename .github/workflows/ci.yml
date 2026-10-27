@@ -45,7 +45,7 @@ jobs:
           BDM_DEFAULT_PROVIDER: "openai"
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage/lcov.info
           flags: nextjs
