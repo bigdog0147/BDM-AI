@@ -487,3 +487,59 @@ export function getEffectiveValidationStatus(memory: Memory): ValidationStatus {
 export function isMemoryActive(memory: Memory): boolean {
   return !memory.superseded_by && memory.validation_status !== "disputed";
 }
+/**
+ * Deletion safety for personal memories.
+ *
+ * A delete may target only an explicitly identified subject; an ambiguous
+ * "forget everything about X" or bare "forget" must not delete without a
+ * confirmation step. Returns null when the instruction is safe to act on.
+ */
+export interface AmbiguityInfo {
+  ambiguous: boolean;
+  /** When unambiguous, the matching memory; otherwise null. */
+  match?: Memory;
+  /** Human-readable suggested target for the confirm UI. */
+  suggested?: string;
+}
+
+/**
+ * Decide whether a forget command needs a confirmation target before
+ * deletion, and if so, what the model should confirm.
+ */
+export function classifyForget(
+  query: string,
+  candidate: Memory | undefined
+): AmbiguityInfo {
+  const q = query.trim().toLowerCase();
+  if (!q) return { ambiguous: true };
+  // Specific identifiers are unambiguous.
+  if (/^the\s+place\b|^this\b|^that\b|^my\s+(?:place|business|company|project|daughter|son|wife|husband)/i.test(q)) {
+    if (candidate && /(?:place|business|company|project|person|address|place)/i.test(candidate.content) === false && !candidate.content.toLowerCase().includes(q)) {
+      return { ambiguous: true };
+    }
+    return { ambiguous: false, match: candidate, suggested: candidate?.content ?? undefined };
+  }
+  // Bare "delete all", "delete everything", "unremember everything": unsafe, requires UI confirmation.
+  if (/^(?:all|everything|every|any|memory|all of|these|those)\b/i.test(q) || q.length < 3) {
+    return { ambiguous: true };
+  }
+  // Otherwise treat as general reference: requires confirming when matched candidate exists but isn't named explicitly.
+  if (candidate) return { ambiguous: true };
+  return { ambiguous: true };
+}
+
+/**
+ * Produce a clarifying question + suggested candidate instead of performing
+ * the deletion. Returns null when the deletion is safe to proceed.
+ */
+export function clarifyAmbiguousDelete(
+  query: string,
+  candidate: Memory | undefined
+): string | null {
+  const info = classifyForget(query, candidate);
+  if (!info.ambiguous) return null;
+  if (info.suggested) {
+    return `Are you sure you want to delete "${info.suggested}"?`;
+  }
+  return "Which memory should I delete?";
+}

@@ -75,6 +75,62 @@ export interface ContextPackage {
   estimatedTokens: number;
 }
 
+export type RouteName =
+  | "SESSION_CONTEXT"
+  | "PERSONAL_MEMORY"
+  | "GENERAL_KNOWLEDGE"
+  | "TOOL_ACTION"
+  | "MIXED"
+  | "CLARIFY";
+
+const ALLOWED_ROUTES: Set<string> = new Set([
+  "SESSION_CONTEXT",
+  "PERSONAL_MEMORY",
+  "GENERAL_KNOWLEDGE",
+  "TOOL_ACTION",
+  "MIXED",
+  "CLARIFY"
+]);
+
+export interface RoutingResult {
+  routes: RouteName[];
+  query_rewrites: string[];
+  needs_clarification: boolean;
+  clarification_question: string | null;
+  confidence: number;
+  reason_codes: string[];
+}
+
+export function isValidRouteName(v: unknown): v is RouteName {
+  return typeof v === "string" && ALLOWED_ROUTES.has(v);
+}
+
+export function validateRoutingResult(r: unknown): RoutingResult | null {
+  if (!r || typeof r !== "object") return null;
+  const o = r as Record<string, unknown>;
+  if (!Array.isArray(o.routes)) return null;
+  if (o.routes.some((item) => !isValidRouteName(item))) return null;
+  const routes = (o.routes as unknown[]).filter(isValidRouteName) as RouteName[];
+  if (routes.length === 0) return null;
+  const rewrites = Array.isArray(o.query_rewrites)
+    ? o.query_rewrites.filter((w) => typeof w === "string")
+    : [];
+  return {
+    routes,
+    query_rewrites: rewrites,
+    needs_clarification: Boolean(o.needs_clarification),
+    clarification_question:
+      typeof o.clarification_question === "string" ? o.clarification_question : null,
+    confidence:
+      typeof o.confidence === "number" && Number.isFinite(o.confidence)
+        ? Math.max(0, Math.min(1, o.confidence))
+        : 0.5,
+    reason_codes: Array.isArray(o.reason_codes)
+      ? o.reason_codes.filter((c) => typeof c === "string")
+      : []
+  };
+}
+
 const MEMORY_TOKEN_ESTIMATE = 150; // rough tokens per memory
 const CAPABILITY_TOKEN_ESTIMATE = 80;
 const TURN_TOKEN_ESTIMATE = 200;
@@ -289,4 +345,84 @@ export function trimContextToBudget(context: ContextPackage): ContextPackage {
   }
 
   return trimmed;
+}/**
+ * Lightweight routing recommendation (recommendation only, not authorization).
+ * Uses the request text, session presence, retrieved memories, and capabilities
+ * to recommend routes, not to enforce them.
+ */
+export function routeContext(input: {
+  text: string;
+  hasSession: boolean;
+  hasMemories: boolean;
+  hasRecentTurn: boolean;
+  toolRequested?: string | null;
+  ambiguous?: boolean;
+}): RoutingResult {
+  const routes: RouteName[] = [];
+  const rewrites: string[] = [];
+  const codes: string[] = [];
+  const lower = input.text.toLowerCase();
+
+  if (input.hasRecentTurn && !input.hasMemories) {
+    routes.push("SESSION_CONTEXT");
+  }
+  if (input.hasMemories || /remember|forget|delete|memory|saved|told you about/i.test(lower)) {
+    routes.push("PERSONAL_MEMORY");
+  }
+  if (/industry|trend|compare with|current|202[4-9]|news|latest/i.test(lower)) {
+    routes.push("GENERAL_KNOWLEDGE");
+  }
+  if (input.toolRequested || /send|email|message|contact|action|do this|perform/i.test(lower)) {
+    routes.push("TOOL_ACTION");
+  }
+  if (routes.length === 0) {
+    routes.push("SESSION_CONTEXT");
+  }
+  if (routes.length > 1) {
+    const set = new Set(routes);
+    if (set.has("PERSONAL_MEMORY") && set.has("GENERAL_KNOWLEDGE")) {
+      // replace with MIXED only when both clearly present
+      const out = routes.filter((r) => r === "PERSONAL_MEMORY" || r === "GENERAL_KNOWLEDGE");
+      if (out.length === 2) routes.length = 0; routes.push("MIXED");
+    }
+  }
+  if (routes.length > 1 && !routes.includes("MIXED")) {
+    // deduplicate to avoid redundant combinations when not clearly mixed
+    const unique = Array.from(new Set(routes));
+    if (unique.length <= 2 && unique.includes("SESSION_CONTEXT") && unique.includes("PERSONAL_MEMORY")) {
+      routes.length = 0; routes.push("SESSION_CONTEXT", "PERSONAL_MEMORY");
+    } else {
+      routes.length = 0;
+      routes.push(...unique);
+    }
+  }
+
+  if (input.ambiguous || /what is my|which one|which business|the place/i.test(lower)) {
+    routes.push("CLARIFY");
+    rewrites.push("clarify_missing_target");
+  }
+  if (!input.hasSession && (routes.includes("PERSONAL_MEMORY") || routes.includes("TOOL_ACTION"))) {
+    // memory or tool requires session; if missing, request clarification
+    routes.length = 0; routes.push("CLARIFY");
+    rewrites.push("needs_authentication");
+  }
+  // Final cleanup: deduplicate, enforce allowlist, bounded
+  const cleaned = Array.from(new Set(routes)).filter(isValidRouteName) as RouteName[];
+  const finalRoutes: RouteName[] = cleaned.length ? (cleaned as RouteName[]) : (["SESSION_CONTEXT"] as RouteName[]);
+  // If clarification needed but already in, don't duplicate
+  if (input.ambiguous && !finalRoutes.includes("CLARIFY")) finalRoutes.push("CLARIFY");
+
+  const confidence = input.ambiguous ? 0.55 : input.hasMemories ? 0.88 : 0.82;
+  if (!input.hasSession) codes.push("NEEDS_SESSION");
+  if (input.ambiguous) codes.push("AMBIGUOUS_TARGET");
+  if (routes.includes("PERSONAL_MEMORY")) codes.push("USES_MEMORY");
+
+  return {
+    routes: finalRoutes,
+    query_rewrites: rewrites,
+    needs_clarification: Boolean(input.ambiguous) || (!input.hasSession && (finalRoutes.includes("PERSONAL_MEMORY") || finalRoutes.includes("TOOL_ACTION"))),
+    clarification_question: input.ambiguous ? "Could you clarify which memory or item you mean?" : (!input.hasSession ? "Please sign in to access personal memories or tools." : null),
+    confidence: Math.round(confidence * 100) / 100,
+    reason_codes: codes
+  };
 }
