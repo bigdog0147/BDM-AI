@@ -51,6 +51,8 @@ async function checkEnvVars(vars: string[]): Promise<{ available: boolean; reaso
   return { available: true };
 }
 
+import { resolveSearchProvider, searchStatus } from "./search";
+
 /**
  * Web Search Capability
  */
@@ -74,9 +76,13 @@ const webSearch: Capability = {
   ],
   availability: {
     check: async () => {
-      const env = await checkEnvVars(["TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY", "SEARXNG_URL"]);
-      if (!env.available) return env;
-      // Could add a ping to the API here
+      const s = searchStatus();
+      if (s.provider && !s.configured) {
+        return { available: false, reason: `Search provider ${s.provider} selected but not configured.` };
+      }
+      if (!s.provider) {
+        return { available: false, reason: "No search provider configured (set BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, TAVILY_KEYLESS=1, or SEARXNG_URL, or set BDM_SEARCH_PROVIDER)." };
+      }
       return { available: true };
     },
     requiredEnv: ["TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY", "SEARXNG_URL"]

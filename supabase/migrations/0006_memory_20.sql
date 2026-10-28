@@ -26,10 +26,10 @@ alter table if exists public.bdm_memories
   add column if not exists superseded_by uuid
     references public.bdm_memories(id) on delete set null;
 
-alter table if not exists public.bdm_memories
+alter table if exists public.bdm_memories
   add column if not exists superseded_at timestamptz;
 
-alter table if not exists public.bdm_memories
+alter table if exists public.bdm_memories
   add column if not exists validation_status text
     check (validation_status in ('unvalidated', 'confirmed', 'disputed', 'stale'))
     default 'unvalidated';

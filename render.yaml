@@ -40,7 +40,6 @@ services:
         sync: false
       - key: OPENROUTER_IMAGE_MODEL
         sync: false
-        sync: false
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY

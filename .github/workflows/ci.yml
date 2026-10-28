@@ -23,6 +23,8 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - name: Targeted Vitest diagnostic (isolated test)
+        run: npm test -- --reporter=verbose src/test/server/kycBackupS3Synthetic.test.ts
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
