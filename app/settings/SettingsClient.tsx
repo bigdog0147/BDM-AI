@@ -440,6 +440,19 @@ export default function SettingsClient() {
           </p>
         </section>
 
+        <section className="settings-section" aria-labelledby="github-heading">
+          <div className="section-head">
+            <div>
+              <h2 id="github-heading">GitHub</h2>
+              <p>OAuth sign-in with server-side identity guard.</p>
+            </div>
+            <span className="status-pill ok">Configured</span>
+          </div>
+          <div className="google-panel">
+            <p className="hint">Link logic uses <code>bdm_github_identities</code> (migration 0005). Add <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code>, and <code>SUPABASE_SERVICE_ROLE_KEY</code> to the server.</p>
+          </div>
+        </section>
+
         <section className="settings-section" aria-labelledby="capabilities-heading">
           <div className="section-head">
             <div>
