@@ -1,0 +1,81 @@
+/**
+ * BDM-AI Design Tokens — Phase 2 shared visual foundation.
+ * Reuses official brand palette: Midnight navy (#030B25), Royal blue
+ * (#155EEF), Gold (#F5C451), Electric cyan (#19CFFF), White (#F5F7FF).
+ * Keeps all existing variables intact; only adds/references new tokens.
+ */
+
+:root {
+  /* Brand palette — official */
+  --token-navy: #030B25;
+  --token-royal: #155EEF;
+  --token-gold: #F5C451;
+  --token-cyan: #19CFFF;
+  --token-white: #F5F7FF;
+
+  /* Surfaces (dark theme, compatible with existing bdm-midnight) */
+  --token-surface-base: #030B25;
+  --token-surface-elevated: #0b1630;
+  --token-surface-card: #09142e;
+  --token-surface-hover: #0f1e3c;
+
+  /* Typography scale */
+  --token-type-xs: 0.75rem;
+  --token-type-sm: 0.875rem;
+  --token-type-base: 1rem;
+  --token-type-lg: 1.125rem;
+  --token-type-xl: 1.25rem;
+  --token-type-2xl: 1.5rem;
+  --token-type-3xl: 1.875rem;
+
+  /* Line-height */
+  --token-leading-tight: 1.25;
+  --token-leading-normal: 1.5;
+  --token-leading-loose: 1.75;
+
+  /* Spacing scale (8pt grid) */
+  --token-space-1: 0.25rem;
+  --token-space-2: 0.5rem;
+  --token-space-3: 0.75rem;
+  --token-space-4: 1rem;
+  --token-space-5: 1.25rem;
+  --token-space-6: 1.5rem;
+  --token-space-8: 2rem;
+  --token-space-10: 2.5rem;
+  --token-space-12: 3rem;
+
+  /* Borders */
+  --token-border-color: rgba(245, 196, 81, 0.16);
+  --token-border-color-strong: rgba(21, 94, 239, 0.38);
+  --token-border-radius-sm: 10px;
+  --token-border-radius: 16px;
+  --token-border-radius-lg: 22px;
+  --token-border-radius-pill: 999px;
+
+  /* Shadows (restrained, premium) */
+  --token-shadow-card: 0 24px 60px rgba(2, 6, 18, 0.55), 0 0 0 1px rgba(245, 196, 81, 0.08);
+  --token-shadow-glow-royal: 0 0 0 1px rgba(21, 94, 239, 0.25), 0 12px 32px rgba(21, 94, 239, 0.18);
+  --token-shadow-glow-gold: 0 0 0 1px rgba(245, 196, 81, 0.18), 0 12px 32px rgba(245, 196, 81, 0.12);
+
+  /* Focus indicators — accessible, visible, not just outline */
+  --token-focus-ring: 0 0 0 2px var(--token-navy), 0 0 0 4px var(--token-royal);
+  --token-focus-ring-gold: 0 0 0 2px var(--token-navy), 0 0 0 4px var(--token-gold);
+
+  /* Transitions */
+  --token-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --token-fast: 140ms var(--token-ease-out);
+  --token-medium: 220ms var(--token-ease-out);
+  --token-slow: 320ms var(--token-ease-out);
+
+  /* Typography family (matches existing) */
+  --token-font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Prefers-color-scheme is not needed — dark is enforced by app */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --token-fast: 0ms;
+    --token-medium: 0ms;
+    --token-slow: 0ms;
+  }
+}

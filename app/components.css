@@ -98,14 +98,20 @@
 
 .auth-field input {
   width: 100%;
-  padding: 11px 13px;
-  border-radius: var(--bdm-radius-sm);
-  border: 1px solid var(--bdm-line-soft);
-  background: rgba(3, 8, 20, 0.6);
-  color: var(--bdm-text);
+  padding: var(--token-space-2) var(--token-space-3);
+  border-radius: var(--token-border-radius-sm);
+  border: 1px solid var(--token-border-color);
+  background: var(--token-surface-card);
+  color: var(--token-white);
   font-size: 14px;
   outline: none;
-  transition: border-color var(--bdm-fast), box-shadow var(--bdm-fast);
+  transition: border-color var(--token-fast), box-shadow var(--token-fast);
+}
+
+.auth-field input:focus-visible {
+  outline: none;
+  border-color: var(--token-royal);
+  box-shadow: var(--token-focus-ring);
 }
 
 .auth-field input:focus {
@@ -960,4 +966,18 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+/* Stage 3A token-enhanced navigation & focus */
+.nav-item:focus-visible, .history-item:focus-visible, .new-chat:focus-visible, .icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--token-focus-ring);
+  border-radius: var(--token-border-radius-sm);
+}
+.sidebar {
+  border-right: 1px solid var(--token-border-color);
+  background: var(--token-surface-base);
+}
+@media (max-width: 760px) {
+  .sidebar { max-width: 100vw; }
 }
