@@ -10,7 +10,7 @@
     "dev:preview": "next dev -p 3011",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.validation.json",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

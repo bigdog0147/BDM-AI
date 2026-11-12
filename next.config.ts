@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Next's TypeScript phase uses the application validation project rather than
+  // the default tsconfig include glob, preventing local experimental/generated
+  // trees from making the build OOM and masking real application diagnostics.
+  typescript: {
+    tsconfigPath: "tsconfig.validation.json"
+  },
   // The dev indicator sits in the bottom-left corner and overlaps the
   // "Sign in with Google" button on the auth screen. It is a development
   // affordance only, so it is turned off for the local preview.

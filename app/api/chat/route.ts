@@ -19,6 +19,11 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Routing guard / local-first: this endpoint uses the BDM-AI configured model
+// (currently ollama:qwen3.5:4b via opencode.json). It does not silently fall
+// back to freellmapi/auto or any paid/cloud provider unless the model config
+// is explicitly changed by the user. Errors distinguish local-unavailable
+// (cold start / VRAM / endpoint down) from provider/auth failures.
 const MAX_MESSAGE_LENGTH = 20000;
 const MAX_PROJECT_LENGTH = 100;
 

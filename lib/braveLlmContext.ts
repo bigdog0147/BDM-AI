@@ -2,6 +2,9 @@
  * Separate Brave LLM Context adapter (design-only / local implementation).
  * GET https://api.search.brave.com/res/v1/llm/context
  *
+ * Routing guard / local-first: this adapter uses Brave Search independently of
+ * the BDM-AI model provider (ollama:qwen3.5:4b local, freellmapi/auto gateway).
+ * It never routes to paid/cloud providers; only to the configured Brave endpoint.
  * Never exposes the subscription token; never sends conversation history,
  * memory, private files, or unrelated user data. Only validated query +
  * explicitly allowed options.

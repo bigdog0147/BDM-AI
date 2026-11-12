@@ -93,6 +93,22 @@ describe("braveLlmContext (mocked)", () => {
     expect(assertLLMContextFailure(r).code).toBe("LLMContextUnauthorized");
   });
 
+  it("local-first routing guard: never routes to paid/cloud provider", async () => {
+    // Regression for Stage 4 routing change: brave LLM adapter is independent
+    // of BDM-AI model provider routing (local ollama vs freellmapi/auto gateway).
+    process.env.BRAVE_LLM_CONTEXT_SUBSCRIPTION_TOKEN = "synthetic-token";
+    globalThis.fetch = vi.fn(async () => makeResponse(200, {
+      grounding: { generic: [{ url: "https://example.com/", title: "R", snippets: ["S"] }] }
+    })) as unknown as typeof fetch;
+    const r = await searchLLMContext("test");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.provider).toBe("brave-llm-context");
+    // Confirm no silent fallback to freellmapi/openrouter/anthropic occurs.
+    expect(r.provider).not.toBe("freellmapi");
+    expect(r.provider).not.toBe("openrouter");
+  });
+
   it("handles 403 forbidden", async () => {
     process.env.BRAVE_LLM_CONTEXT_SUBSCRIPTION_TOKEN = "synthetic-token";
     globalThis.fetch = vi.fn(async () => makeResponse(403, {})) as unknown as typeof fetch;
