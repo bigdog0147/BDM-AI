@@ -4,11 +4,8 @@ import { currentUser } from "../../../lib/auth";
 import { environmentStatus } from "../../../lib/diagnostics";
 import { emailStatus } from "../../../lib/email";
 import { webhookStorageConfigured } from "../../../lib/email-events";
-import {
-  getGoogleConfig,
-  googleCallbackUrl,
-  requestOrigin
-} from "../../../lib/google-auth";
+import { getGoogleConfig, googleCallbackUrl } from "../../../lib/google-auth";
+import { requestOrigin } from "../../../lib/http";
 import {
   findGoogleLinkForUser,
   googleIdentityStoreConfigured
@@ -31,7 +28,7 @@ export async function GET(request: Request): Promise<Response> {
   const user = await currentUser();
   const voice = transcriptionStatus();
   const email = emailStatus();
-  const googleConfig = getGoogleConfig(request.url);
+  const googleConfig = getGoogleConfig(requestOrigin(request));
   const googleStore = googleIdentityStoreConfigured();
   const googleLink =
     user && googleStore ? await findGoogleLinkForUser(user.id) : null;
@@ -71,7 +68,7 @@ export async function GET(request: Request): Promise<Response> {
       configured: googleConfig.ok && googleStore,
       credentialsConfigured: googleConfig.ok,
       identityStoreConfigured: googleStore,
-      callbackUrl: googleCallbackUrl(request.url),
+      callbackUrl: googleCallbackUrl(requestOrigin(request)),
       // The origin to register as an authorized JavaScript origin.
       origin: requestOrigin(request),
       linked: Boolean(user && googleLink?.ok && googleLink.value),

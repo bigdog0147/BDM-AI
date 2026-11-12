@@ -74,7 +74,7 @@ export default function Welcome({
         <BrandLogo variant="emblem" size={64} decorative />
       </div>
       <p className="welcome-eyebrow">BDM — Personal AI</p>
-      <h1 className="welcome-title">
+      <h1 className="welcome-title" suppressHydrationWarning>
         {greeting}
         {name ? <span className="welcome-name">, {name}</span> : null}
       </h1>

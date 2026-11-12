@@ -2,6 +2,25 @@
 
 > A private personal AI workspace with memory, voice notes and sourced web research.
 
+## 🚀 Introducing BDM AI — Your Personal AI Assistant
+
+BDM AI is a next-generation personal AI designed to help you think smarter, research faster, create more, and simplify everyday tasks — all in one place.
+
+### ✨ Key Features
+- 🤖 **Intelligent AI conversations and assistance**
+- 🔍 **Web research and information discovery**
+- 🎙️ **Voice notes and voice-based interaction**
+- 🧠 **Personal memory and personalized assistance**
+- 🔐 **Secure sign-in and account management**
+- 🌐 **A platform designed to grow with future AI technologies**
+- ⚡ **A smarter workspace for productivity, creativity, and development**
+
+💙💛 **BDM AI — Intelligence Meets Innovation.**  
+The future isn't just about artificial intelligence. It's about making AI work for you.  
+🚀 **BDM AI: Think Smarter. Do More. Go Beyond**
+
+---
+
 Private by default. Voice notes are transcribed and discarded, and research shows the sources behind every claim.
 
 Enter sends · Shift+Enter for a new line
@@ -80,9 +99,9 @@ system.
 
 1. In Google Cloud Console, create a **Web application** OAuth client.
 2. Add the **Authorized redirect URI**:
-   `https://bdm-ai.onrender.com/auth/callback/google`
-   (and `http://localhost:3000/auth/callback/google` for local development).
-3. Add the **Authorized JavaScript origin**: `https://bdm-ai.onrender.com`.
+   `https://bdmai.cloud/auth/callback/google`
+   (and `http://localhost:3001/auth/callback/google` for local development).
+3. Add the **Authorized JavaScript origin**: `https://bdmai.cloud`.
 4. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the server
    environment. `GOOGLE_REDIRECT_URI` should be set explicitly in production
    so the registered value cannot drift.
@@ -269,9 +288,9 @@ Google from `/settings`.
 Owner setup:
 
 1. Google Cloud Console -> create an **OAuth 2.0 Web application** client.
-2. Authorized redirect URI: `https://bdm-ai.onrender.com/auth/callback/google`
-   (and `http://localhost:3000/auth/callback/google` for local development).
-3. Authorized JavaScript origin: `https://bdm-ai.onrender.com`.
+2. Authorized redirect URI: `https://bdmai.cloud/auth/callback/google`
+   (and `http://localhost:3001/auth/callback/google` for local development).
+3. Authorized JavaScript origin: `https://bdmai.cloud`.
 4. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REDIRECT_URI`
    in the server environment (Render dashboard for the live app).
 5. Set `SUPABASE_SERVICE_ROLE_KEY` (server only) and apply

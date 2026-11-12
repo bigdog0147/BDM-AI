@@ -317,36 +317,6 @@ export async function googleProviderStatus(options?: {
 }
 
 /**
- * The public origin of the current request.
- */
-export function requestOrigin(request: Request): string {
-  const url = new URL(request.url);
-  const forwardedProto = request.headers
-    .get("x-forwarded-proto")
-    ?.split(",")[0]
-    ?.trim()
-    .toLowerCase();
-  const forwardedHost = request.headers
-    .get("x-forwarded-host")
-    ?.split(",")[0]
-    ?.trim();
-  const hostHeader = request.headers.get("host")?.trim();
-
-  const host = forwardedHost || hostHeader;
-  const hostIsValid = Boolean(host) && /^[a-z0-9.\-[\]:]+$/i.test(host ?? "");
-
-  if (hostIsValid) {
-    const scheme =
-      forwardedProto === "http" || forwardedProto === "https"
-        ? forwardedProto
-        : url.protocol.replace(":", "");
-    return `${scheme}://${host}`;
-  }
-
-  return url.origin;
-}
-
-/**
  * Only same-site, relative paths are accepted as a post-login destination.
  */
 export function safeRedirectPath(value: string | null | undefined): string {
