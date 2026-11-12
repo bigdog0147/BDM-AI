@@ -1,0 +1,447 @@
+/* =============================================================================
+   BDM AI Modern High-Vibrancy Theme
+   Elevates the entire BDM AI workspace and Administration portal from a
+   flat/dull aesthetic to a luminous, futuristic, glassmorphic experience.
+   ========================================================================== */
+
+:root {
+  /* Ultra-modern palette overrides */
+  --bdm-midnight: #070a13;
+  --bdm-midnight-2: #020408;
+  --bdm-panel: rgba(13, 22, 44, 0.72);
+  --bdm-panel-2: rgba(18, 30, 58, 0.82);
+  --bdm-panel-3: rgba(24, 40, 78, 0.92);
+  
+  --bdm-line: rgba(56, 189, 248, 0.22);
+  --bdm-line-soft: rgba(255, 255, 255, 0.08);
+  --bdm-line-strong: rgba(0, 240, 255, 0.45);
+
+  --bdm-royal: #4f46e5;
+  --bdm-electric: #00f0ff;
+  --bdm-cyan-glow: rgba(0, 240, 255, 0.25);
+  --bdm-gold: #fbbf24;
+  --bdm-gold-rich: #f59e0b;
+  --bdm-emerald: #10b981;
+  --bdm-ruby: #f43f5e;
+
+  --bdm-text: #f8fafc;
+  --bdm-muted: #94a3b8;
+  --bdm-faint: #64748b;
+
+  --bdm-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --bdm-glow: 0 0 28px rgba(0, 240, 255, 0.22), 0 0 60px rgba(79, 70, 229, 0.16);
+  --bdm-glass-blur: blur(20px) saturate(180%);
+}
+
+/* ----------------------------------------------------------- Global Atmosphere */
+body {
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(79, 70, 229, 0.28), transparent 60%),
+    radial-gradient(1000px 600px at 85% 10%, rgba(6, 182, 212, 0.22), transparent 55%),
+    radial-gradient(800px 500px at 50% 110%, rgba(245, 158, 11, 0.12), transparent 50%),
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(180deg, var(--bdm-midnight) 0%, var(--bdm-midnight-2) 100%) !important;
+  background-attachment: fixed !important;
+  color: var(--bdm-text);
+}
+
+/* ----------------------------------------------------------- Workspace Shell */
+.topbar {
+  background: rgba(7, 10, 19, 0.75) !important;
+  backdrop-filter: var(--bdm-glass-blur);
+  -webkit-backdrop-filter: var(--bdm-glass-blur);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+.topbar::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.45) 30%,
+    rgba(251, 191, 36, 0.45) 70%,
+    transparent 100%
+  ) !important;
+  height: 2px !important;
+}
+
+.sidebar {
+  background: rgba(8, 13, 26, 0.82) !important;
+  backdrop-filter: var(--bdm-glass-blur);
+  -webkit-backdrop-filter: var(--bdm-glass-blur);
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 12px 0 36px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Navigation items in sidebar */
+.nav-item {
+  border-radius: 12px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  color: var(--bdm-muted) !important;
+  border: 1px solid transparent !important;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  transform: translateX(2px);
+}
+
+.nav-item.active {
+  background: linear-gradient(110deg, rgba(79, 70, 229, 0.35), rgba(6, 182, 212, 0.15)) !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+.nav-item.active::before {
+  background: linear-gradient(180deg, var(--bdm-electric), var(--bdm-royal)) !important;
+  box-shadow: 0 0 12px var(--bdm-electric) !important;
+  width: 3px !important;
+}
+
+.nav-item.active .nav-icon {
+  color: var(--bdm-electric) !important;
+  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.6));
+}
+
+/* ----------------------------------------------------------- Hero & Welcome */
+.welcome-hero {
+  padding-top: 2rem !important;
+}
+
+.welcome-mark {
+  position: relative;
+}
+
+.welcome-mark::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140px;
+  height: 140px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.35) 0%, rgba(79, 70, 229, 0.2) 50%, transparent 70%);
+  filter: blur(20px);
+  z-index: -1;
+  pointer-events: none;
+  animation: pulse-glow 4s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+}
+
+.hero h1,
+.welcome-title {
+  background: linear-gradient(135deg, #ffffff 30%, #c7d2fe 70%, #38bdf8 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.hero p,
+.welcome-desc {
+  color: var(--bdm-muted) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.6 !important;
+}
+
+/* ----------------------------------------------------------- Suggestion Cards */
+.suggestion {
+  background: linear-gradient(145deg, rgba(17, 28, 54, 0.7), rgba(10, 16, 32, 0.8)) !important;
+  backdrop-filter: var(--bdm-glass-blur);
+  -webkit-backdrop-filter: var(--bdm-glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  cursor: pointer;
+}
+
+.suggestion:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
+  background: linear-gradient(145deg, rgba(22, 38, 74, 0.85), rgba(13, 22, 44, 0.9)) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 240, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.suggestion .suggestion-icon {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.25), rgba(6, 182, 212, 0.25)) !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  color: var(--bdm-electric) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.2) !important;
+}
+
+.suggestion:hover .suggestion-icon {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.3), rgba(251, 191, 36, 0.25)) !important;
+  border-color: var(--bdm-electric) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.5) !important;
+}
+
+/* ----------------------------------------------------------- Chat Composer */
+.composer-frame,
+.composer {
+  background: rgba(11, 19, 38, 0.78) !important;
+  backdrop-filter: var(--bdm-glass-blur);
+  -webkit-backdrop-filter: var(--bdm-glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.composer-frame:focus-within,
+.composer:focus-within {
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 240, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.mode-chip,
+.composer-chip {
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--bdm-muted) !important;
+  font-weight: 500 !important;
+  transition: all 0.18s ease !important;
+}
+
+.mode-chip:hover:not(:disabled),
+.composer-chip:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.mode-chip.active,
+.composer-chip.active {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.4), rgba(6, 182, 212, 0.3)) !important;
+  border-color: var(--bdm-electric) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35) !important;
+}
+
+.button.primary,
+.send-btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border: none !important;
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4), 0 0 15px rgba(6, 182, 212, 0.25) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.button.primary:hover:not(:disabled),
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.6), 0 0 25px rgba(6, 182, 212, 0.45) !important;
+  filter: brightness(1.1) !important;
+}
+
+.button.secondary {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: var(--bdm-text) !important;
+  backdrop-filter: blur(10px) !important;
+  transition: all 0.2s ease !important;
+}
+
+.button.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ----------------------------------------------------------- Chat Message Bubbles */
+.message.user .message-body {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.7), rgba(15, 23, 42, 0.85)) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  border-radius: 18px 18px 4px 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(56, 189, 248, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.message.assistant .message-body {
+  background: rgba(14, 23, 46, 0.65) !important;
+  backdrop-filter: var(--bdm-glass-blur);
+  -webkit-backdrop-filter: var(--bdm-glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 18px 18px 18px 4px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* =============================================================================
+   ADMINISTRATION COMMAND PORTAL MODERNIZATION
+   ========================================================================== */
+.settings-page {
+  background: transparent !important;
+}
+
+.settings-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding-bottom: 1.5rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.settings-title-copy h1 {
+  background: linear-gradient(135deg, #ffffff 40%, #c7d2fe 75%, #38bdf8 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* KPI Stat Cards in Admin */
+.capability-card {
+  background: linear-gradient(145deg, rgba(16, 26, 52, 0.75), rgba(9, 15, 32, 0.85)) !important;
+  backdrop-filter: var(--bdm-glass-blur);
+  -webkit-backdrop-filter: var(--bdm-glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.09) !important;
+  transition: all 0.22s ease !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.capability-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.6), transparent);
+}
+
+.capability-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.15) !important;
+}
+
+/* Settings & Admin Section Cards */
+.settings-card {
+  background: linear-gradient(145deg, rgba(14, 23, 46, 0.72), rgba(8, 14, 29, 0.85)) !important;
+  backdrop-filter: var(--bdm-glass-blur);
+  -webkit-backdrop-filter: var(--bdm-glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  padding: 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.settings-card-head {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+  padding-bottom: 1rem !important;
+  margin-bottom: 1.25rem !important;
+}
+
+.settings-card-head h2 {
+  font-size: 1.2rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.6rem !important;
+}
+
+/* Glowing Chips & Status Badges */
+.chip {
+  border-radius: 999px !important;
+  padding: 0.3rem 0.75rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+.chip.ok {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25) !important;
+}
+
+.chip.warn {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25) !important;
+}
+
+.chip.danger,
+.chip.error {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+  border: 1px solid rgba(239, 68, 68, 0.35) !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.25) !important;
+}
+
+/* Glass Tables in Admin & Telemetry */
+table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+th {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--bdm-muted) !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.06em !important;
+  padding: 0.85rem 1rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+td {
+  padding: 0.85rem 1rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  color: var(--bdm-text) !important;
+  font-size: 0.85rem !important;
+}
+
+tr:last-child td {
+  border-bottom: none !important;
+}
+
+tr:hover td {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(5, 8, 18, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(79, 70, 229, 0.6), rgba(6, 182, 212, 0.6));
+  border-radius: 999px;
+  border: 2px solid rgba(5, 8, 18, 0.6);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #4f46e5, #06b6d4);
+}
