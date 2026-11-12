@@ -304,6 +304,12 @@ export default function Sidebar({
                 }}
               />
               <NavItem
+                icon="shield"
+                label="Admin"
+                href="/admin"
+                title="Administration Panel"
+              />
+              <NavItem
                 icon="help"
                 label="Help"
                 onClick={() => {
