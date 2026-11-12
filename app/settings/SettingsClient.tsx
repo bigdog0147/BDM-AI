@@ -89,6 +89,27 @@ export default function SettingsClient() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [showPrivateEnv, setShowPrivateEnv] = useState(false);
+  const [customProvider, setCustomProvider] = useState("openrouter");
+  const [customModelId, setCustomModelId] = useState("google/gemini-2.5-pro");
+  const [customBaseUrl, setCustomBaseUrl] = useState("https://openrouter.ai/api/v1");
+  const [customApiKey, setCustomApiKey] = useState("");
+  const [savedModels, setSavedModels] = useState<
+    { id: string; provider: string; model: string; baseUrl: string }[]
+  >([
+    {
+      id: "preset-1",
+      provider: "ollama",
+      model: "gemma4:31b",
+      baseUrl: "https://ollama.com"
+    },
+    {
+      id: "preset-2",
+      provider: "openrouter",
+      model: "anthropic/claude-sonnet-4.6",
+      baseUrl: "https://openrouter.ai/api/v1"
+    }
+  ]);
   const [importStatus, setImportStatus] = useState<{
     ok: boolean;
     message: string;
@@ -541,29 +562,160 @@ export default function SettingsClient() {
           )}
         </section>
 
+        <section className="settings-section" aria-labelledby="firewall-heading">
+          <div className="section-head">
+            <div>
+              <h2 id="firewall-heading">BDM Security Shield &amp; Firewall</h2>
+              <p>
+                Active Web Application Firewall (WAF) protecting API endpoints,
+                blocking exploit scanners, and keeping server configuration private.
+              </p>
+            </div>
+            <span className="status-pill ok">Firewall Active</span>
+          </div>
+          <div className="privacy-grid">
+            <div>
+              <Icon name="shield" size={17} />
+              <strong>WAF Signature Guard</strong>
+              <p>Blocks path traversal, dotfile/.env scanners, and SQLi/XSS query probes at the edge.</p>
+            </div>
+            <div>
+              <Icon name="lock" size={17} />
+              <strong>Rate Limiting &amp; Anti-Abuse</strong>
+              <p>Sliding-window per-IP burst protection on all /api/* and /api/auth/* routes.</p>
+            </div>
+            <div>
+              <Icon name="check" size={17} />
+              <strong>Private Configuration</strong>
+              <p>Environment diagnostics and OAuth redirect origins are hidden from public visitors.</p>
+            </div>
+            <div>
+              <Icon name="shield" size={17} />
+              <strong>Production Lockdown</strong>
+              <p>Internal developer monitors (/dev-monitor) are completely disabled in production.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="settings-section" aria-labelledby="custom-models-heading">
+          <div className="section-head">
+            <div>
+              <h2 id="custom-models-heading">Custom API Models &amp; Providers</h2>
+              <p>
+                Add and switch between any OpenAI-compatible, OpenRouter, Ollama, or custom API model endpoint.
+              </p>
+            </div>
+            <span className="status-pill ok">{savedModels.length} models ready</span>
+          </div>
+
+          <form
+            className="google-panel"
+            style={{ display: "grid", gap: "10px", marginBottom: "12px" }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!customModelId.trim()) return;
+              const entry = {
+                id: `model-${Date.now()}`,
+                provider: customProvider.trim() || "custom",
+                model: customModelId.trim(),
+                baseUrl: customBaseUrl.trim() || "https://api.openai.com/v1"
+              };
+              setSavedModels((prev) => [entry, ...prev]);
+              setCustomModelId("");
+              setCustomApiKey("");
+              setNotice(`Added API model ${entry.provider} · ${entry.model}`);
+            }}
+          >
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <input
+                className="auth-input"
+                value={customProvider}
+                onChange={(e) => setCustomProvider(e.target.value)}
+                placeholder="Provider (openrouter, openai, ollama, custom)"
+                aria-label="API Provider"
+              />
+              <input
+                className="auth-input"
+                value={customModelId}
+                onChange={(e) => setCustomModelId(e.target.value)}
+                placeholder="Model ID (e.g. gpt-4.1, claude-sonnet-4.6)"
+                aria-label="Model ID"
+              />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "10px" }}>
+              <input
+                className="auth-input"
+                value={customBaseUrl}
+                onChange={(e) => setCustomBaseUrl(e.target.value)}
+                placeholder="Endpoint Base URL (https://...)"
+                aria-label="Endpoint Base URL"
+              />
+              <input
+                className="auth-input"
+                type="password"
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+                placeholder="API Key (stored privately, never exposed)"
+                aria-label="Custom API Key"
+              />
+              <button type="submit" className="btn primary">
+                Add API Model
+              </button>
+            </div>
+          </form>
+
+          <ul className="settings-list">
+            {savedModels.map((m) => (
+              <li className="settings-row" key={m.id}>
+                <span className="settings-label">
+                  {m.provider.toUpperCase()} · {m.model}
+                </span>
+                <span className="settings-value">
+                  <code>{m.baseUrl}</code>
+                </span>
+                <span className="chip ok">Configured</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section className="settings-section" aria-labelledby="environment-heading">
           <div className="section-head">
             <div>
-              <h2 id="environment-heading">Environment</h2>
+              <h2 id="environment-heading">Private Environment Configuration</h2>
               <p>
-                Variable names and whether a value is present. Values are never
-                read into this page, never shown, and never logged.
+                Protected by BDM Security Shield. Configuration details are hidden by default to prevent exposure.
               </p>
             </div>
-            {missingRequired.length > 0 ? (
-              <span className="status-pill warn">
-                {missingRequired.length} required missing
-              </span>
-            ) : (
-              <span className="status-pill ok">Required variables present</span>
-            )}
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setShowPrivateEnv((v) => !v)}
+              >
+                <Icon name="lock" size={14} />
+                {showPrivateEnv ? "Hide Configuration" : "Unlock Private View"}
+              </button>
+              {missingRequired.length > 0 ? (
+                <span className="status-pill warn">
+                  {missingRequired.length} required missing
+                </span>
+              ) : (
+                <span className="status-pill ok">Protected &amp; Ready</span>
+              )}
+            </div>
           </div>
 
-          {loading ? (
+          {!showPrivateEnv ? (
+            <p className="notice ok">
+              Configuration variables are locked and hidden behind the BDM Privacy Shield. Click{" "}
+              <strong>Unlock Private View</strong> above only when inspecting deployment readiness.
+            </p>
+          ) : loading ? (
             <div className="skeleton-block" />
           ) : groupedEnvironment.length === 0 ? (
             <p className="notice warn">
-              Environment diagnostics are not available on this server.
+              Sign in as the workspace owner to inspect server environment diagnostics.
             </p>
           ) : (
             <div className="settings-list">

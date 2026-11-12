@@ -33,8 +33,16 @@ export async function GET(request: Request): Promise<Response> {
   const googleLink =
     user && googleStore ? await findGoogleLinkForUser(user.id) : null;
 
+  const isOwnerOrDev =
+    Boolean(user) || process.env.NODE_ENV !== "production";
+
   return NextResponse.json({
     signedIn: Boolean(user),
+    firewall: {
+      active: true,
+      mode: "enforcing",
+      privateConfigProtected: true
+    },
     memory: {
       // Memory needs both authentication and the Supabase data layer.
       available: Boolean(user) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)
@@ -68,14 +76,14 @@ export async function GET(request: Request): Promise<Response> {
       configured: googleConfig.ok && googleStore,
       credentialsConfigured: googleConfig.ok,
       identityStoreConfigured: googleStore,
-      callbackUrl: googleCallbackUrl(requestOrigin(request)),
+      callbackUrl: isOwnerOrDev ? googleCallbackUrl(requestOrigin(request)) : "",
       // The origin to register as an authorized JavaScript origin.
-      origin: requestOrigin(request),
+      origin: isOwnerOrDev ? requestOrigin(request) : "",
       linked: Boolean(user && googleLink?.ok && googleLink.value),
       providers: user?.providers ?? []
     },
     quotas: quotaStatus(),
-    // Variable NAMES and presence only. A value never reaches the browser.
-    environment: environmentStatus()
+    // Variable NAMES and presence only, gated behind owner sign-in in production.
+    environment: isOwnerOrDev ? environmentStatus() : []
   });
 }

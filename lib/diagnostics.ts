@@ -183,13 +183,22 @@ const DEFINITIONS: EnvDefinition[] = [
  * returned, logged, or interpolated into the response.
  */
 export function environmentStatus(): EnvVarStatus[] {
-  return DEFINITIONS.map((definition) => ({
-    name: definition.name,
-    present: Boolean(process.env[definition.name]?.trim()),
-    purpose: definition.purpose,
-    kind: definition.kind,
-    group: definition.group
-  }));
+  return DEFINITIONS.map((definition) => {
+    const present =
+      definition.name === "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+        ? Boolean(
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+          )
+        : Boolean(process.env[definition.name]?.trim());
+    return {
+      name: definition.name,
+      present,
+      purpose: definition.purpose,
+      kind: definition.kind,
+      group: definition.group
+    };
+  });
 }
 
 /** The variables that are required but missing. */

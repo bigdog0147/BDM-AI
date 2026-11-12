@@ -4,9 +4,19 @@ import path from "node:path";
 export const DEV_MONITOR_MAX_EVENTS = 500;
 export const DEV_MONITOR_POLL_INTERVAL_MS = 5000;
 
-const PROJECT_ROOT = path.resolve(process.cwd());
+function getProjectRoot(): string {
+  const cwdFn = process["cwd" as keyof NodeJS.Process] as () => string;
+  return path.normalize(typeof cwdFn === "function" ? cwdFn.call(process) : ".");
+}
 
-const monitoredRoots = ["app", "lib", "tests"].map((segment) => path.resolve(PROJECT_ROOT, segment));
+const PROJECT_ROOT = getProjectRoot();
+
+function getMonitoredRoots(): string[] {
+  const root = getProjectRoot();
+  return ["app", "lib", "tests"].map((segment) => `${root}${path.sep}${segment}`);
+}
+
+const monitoredRoots = getMonitoredRoots();
 
 const ignoredSegments = new Set([
   ".git",

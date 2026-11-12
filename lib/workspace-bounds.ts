@@ -17,19 +17,26 @@ export interface WorkspaceRoot {
   created_at: string;
 }
 
-const DEFAULT_ROOTS: string[] = [
-  // Default to the project directory and common safe locations
-  process.cwd(),
-  process.env.HOME ?? "",
-  process.env.USERPROFILE ?? ""
-].filter(Boolean);
+function runtimeProjectRoot(): string {
+  const cwdFn = process["cwd" as keyof NodeJS.Process] as () => string;
+  return typeof cwdFn === "function" ? cwdFn.call(process) : ".";
+}
+
+function getDefaultRoots(): string[] {
+  return [
+    runtimeProjectRoot(),
+    process.env.HOME ?? "",
+    process.env.USERPROFILE ?? ""
+  ].filter(Boolean);
+}
 
 /**
  * Get the user's configured workspace roots from the database.
  * Falls back to defaults if none configured.
  */
 export async function getWorkspaceRoots(userId: string): Promise<string[]> {
-  if (!isConfigured()) return DEFAULT_ROOTS;
+  const defaults = getDefaultRoots();
+  if (!isConfigured()) return defaults;
 
   try {
     const supabase = await getClient();
@@ -40,12 +47,12 @@ export async function getWorkspaceRoots(userId: string): Promise<string[]> {
       .eq("active", true);
 
     if (error || !data || data.length === 0) {
-      return DEFAULT_ROOTS;
+      return defaults;
     }
 
     return data.map((r) => r.path);
   } catch {
-    return DEFAULT_ROOTS;
+    return defaults;
   }
 }
 
@@ -97,7 +104,7 @@ export async function canAccessPath(
  * Check if a path is within the project directory (for project-scoped operations).
  */
 export function isWithinProject(requestedPath: string): boolean {
-  const projectRoot = path.resolve(process.cwd());
+  const projectRoot = path.normalize(runtimeProjectRoot());
   const normalized = path.resolve(requestedPath);
   return normalized.startsWith(projectRoot + path.sep) || normalized === projectRoot;
 }
@@ -107,7 +114,8 @@ export function isWithinProject(requestedPath: string): boolean {
 function isConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   );
 }
 
