@@ -48,7 +48,7 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1200);
-    const res = await fetch("http://127.0.0.1:8787/telemetry", {
+    const res = await fetch("http://127.0.0.1:8787/identity", {
       signal: controller.signal
     });
     clearTimeout(timeout);

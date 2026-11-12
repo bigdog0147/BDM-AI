@@ -403,7 +403,10 @@ export default function AdminClient() {
               {data.services.jarvisBridge.connected ? "LINKED & ONLINE" : "STANDBY / UNREACHABLE"}
             </div>
             <span className="subtle" style={{ fontSize: "0.8rem" }}>
-              {data.services.jarvisBridge.telemetry?.brain || "Local Bridge"} · ws://127.0.0.1:8787
+              {data.services.jarvisBridge.telemetry?.identity?.name
+                ? `${data.services.jarvisBridge.telemetry.identity.name} (${data.services.jarvisBridge.telemetry.identity.alias})`
+                : "Local Bridge"}{" "}
+              · ws://127.0.0.1:8787
             </span>
           </div>
         </section>
