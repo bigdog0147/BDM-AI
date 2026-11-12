@@ -139,6 +139,41 @@ export default function AdminClient() {
   const [error, setError] = useState<string | null>(null);
   const [passcode, setPasscode] = useState("");
   const [isRefreshing, startTransition] = useTransition();
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncWithJarvis = async (action: string) => {
+    setIsSyncing(true);
+    setSyncStatusMsg(null);
+    try {
+      const res = await fetch("/api/jarvis/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          text:
+            action === "add_memory"
+              ? "BDM AI workspace verified with Google login (djbigdog22@gmail.com) and full multimodal mesh."
+              : undefined
+        })
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setSyncStatusMsg(
+          action === "add_memory"
+            ? "Memory checkpoint successfully saved to BIG DOG / JARVIS external drive!"
+            : "Synchronized successfully with BIG DOG · J.A.R.V.I.S. external drive!"
+        );
+        loadData();
+      } else {
+        setSyncStatusMsg(json.error || "Sync failed");
+      }
+    } catch {
+      setSyncStatusMsg("Network error connecting to external memory.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const loadData = async (customPasscode?: string) => {
     setLoading(true);
@@ -720,6 +755,30 @@ export default function AdminClient() {
                   {data.externalMemory.memoriesCount} Memories · {data.externalMemory.tasksCount} Tasks
                 </div>
               </div>
+            </div>
+
+            <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => handleSyncWithJarvis("sync_check")}
+                disabled={isSyncing}
+              >
+                <Icon name="retry" size={15} /> {isSyncing ? "Syncing..." : "Sync with BIG DOG · J.A.R.V.I.S."}
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => handleSyncWithJarvis("add_memory")}
+                disabled={isSyncing}
+              >
+                <Icon name="sparkle" size={15} /> Save BDM Checkpoint Memory to Drive
+              </button>
+              {syncStatusMsg && (
+                <span className="chip ok" style={{ marginLeft: "0.5rem" }}>
+                  {syncStatusMsg}
+                </span>
+              )}
             </div>
           </section>
         )}

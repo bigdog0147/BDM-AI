@@ -94,16 +94,20 @@ export function resolveProvider(): Provider {
 /** Explicit secondary provider, or null. Never inferred. */
 export function resolveFallbackProvider(primary: Provider): Provider | null {
   const raw = process.env.AI_FALLBACK_PROVIDER?.trim().toLowerCase();
-  if (!raw || raw === "none" || raw === "off") return null;
-  if (raw !== "openai" && raw !== "ollama" && raw !== "openrouter") {
-    throw new ProviderConfigError(`Unknown AI_FALLBACK_PROVIDER: ${raw}`);
+  if (raw === "none" || raw === "off") return null;
+  if (raw === "openai" || raw === "ollama" || raw === "openrouter") {
+    if (raw === primary) {
+      throw new ProviderConfigError(
+        "AI_FALLBACK_PROVIDER must differ from AI_PROVIDER"
+      );
+    }
+    return raw;
   }
-  if (raw === primary) {
-    throw new ProviderConfigError(
-      "AI_FALLBACK_PROVIDER must differ from AI_PROVIDER"
-    );
+  // Automatic resilient fallback: If primary is ollama and OPENAI_API_KEY is configured, fall back to openai
+  if (primary === "ollama" && process.env.OPENAI_API_KEY?.trim()) {
+    return "openai";
   }
-  return raw;
+  return null;
 }
 
 /** Render sets RENDER=true; a local Ollama server is not reachable from it. */

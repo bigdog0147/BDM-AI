@@ -73,7 +73,8 @@ export async function getAdminAccess(request?: Request): Promise<AdminAccessVerd
   const adminEmails = [
     process.env.ADMIN_EMAIL,
     process.env.OWNER_EMAIL,
-    process.env.NEXT_PUBLIC_ADMIN_EMAIL
+    process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+    "djbigdog22@gmail.com"
   ]
     .filter(Boolean)
     .flatMap((val) => (val ? val.split(",") : []))
