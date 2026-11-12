@@ -103,9 +103,14 @@ export function resolveFallbackProvider(primary: Provider): Provider | null {
     }
     return raw;
   }
-  // Automatic resilient fallback: If primary is ollama and OPENAI_API_KEY is configured, fall back to openai
-  if (primary === "ollama" && process.env.OPENAI_API_KEY?.trim()) {
-    return "openai";
+  // Automatic resilient fallback: If primary is ollama, check openrouter first (broadest model access) then openai
+  if (primary === "ollama") {
+    if (process.env.OPENROUTER_API_KEY?.trim()) {
+      return "openrouter";
+    }
+    if (process.env.OPENAI_API_KEY?.trim()) {
+      return "openai";
+    }
   }
   return null;
 }
@@ -169,10 +174,7 @@ export function resolveOllamaFallbackHost(): string {
 }
 
 export function resolveOpenAIModel(): string {
-  const model = process.env.OPENAI_MODEL?.trim();
-  if (!model) {
-    throw new ProviderConfigError("OPENAI_MODEL is not configured");
-  }
+  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o";
   return model;
 }
 
@@ -677,7 +679,7 @@ function ollamaReadiness(): {
 function providerReady(provider: Provider): boolean {
   if (provider === "openai") {
     return Boolean(
-      process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_MODEL?.trim()
+      process.env.OPENAI_API_KEY?.trim() && (process.env.OPENAI_MODEL?.trim() || "gpt-4o")
     );
   }
   if (provider === "openrouter") {
