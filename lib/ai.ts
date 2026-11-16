@@ -94,7 +94,12 @@ export function resolveProvider(): Provider {
 /** Explicit secondary provider, or null. */
 export function resolveFallbackProvider(primary: Provider): Provider | null {
   const raw = process.env.AI_FALLBACK_PROVIDER?.trim().toLowerCase();
-  if (raw === "none" || raw === "off") return null;
+  if (raw === "none" || raw === "off") {
+    if (primary === "ollama" && process.env.OPENROUTER_API_KEY?.trim()) {
+      return "openrouter";
+    }
+    return null;
+  }
   if (raw) {
     if (raw === "openai" || raw === "ollama" || raw === "openrouter") {
       if (raw === primary) {
@@ -150,8 +155,19 @@ export function resolveOllamaApiHost(): string | null {
 }
 
 export function resolveOllamaApiKey(): string | null {
-  const key = process.env.OLLAMA_API_KEY?.trim();
+  const key =
+    process.env.OLLAMA_API_KEY?.trim() ||
+    process.env.OLLAMA_API_KEY2?.trim() ||
+    process.env.OLLAMA_API_KEY_?.trim();
   return key ? key : null;
+}
+
+export function resolveAllOllamaApiKeys(): string[] {
+  return [
+    process.env.OLLAMA_API_KEY?.trim(),
+    process.env.OLLAMA_API_KEY2?.trim(),
+    process.env.OLLAMA_API_KEY_?.trim()
+  ].filter((k): k is string => Boolean(k));
 }
 
 export function resolveOllamaModel(): string {
@@ -403,6 +419,37 @@ export async function callOllama(
       error instanceof ProviderError
         ? error
         : new ProviderError("ollama", "bad_response", "ollama failed");
+
+    // In cloud mode, rotate through any backup Ollama API keys (OLLAMA_API_KEY2, OLLAMA_API_KEY_)
+    // and try fast cloud fallback models if on Render.
+    if (target.mode === "cloud") {
+      const altKeys = resolveAllOllamaApiKeys().filter((k) => k !== target.apiKey);
+      for (const altKey of altKeys) {
+        try {
+          const text = await requestOllama(args, target.model, target.host, altKey);
+          return { text, model: target.model };
+        } catch {
+          // continue
+        }
+      }
+      if (isRender() && primary.kind !== "auth") {
+        const cloudRescueModels = ["deepseek-v4.1-flash", "glm-5.3-flash"].filter(
+          (m) => m !== target.model
+        );
+        const allKeys = resolveAllOllamaApiKeys();
+        for (const rescueModel of cloudRescueModels) {
+          for (const key of allKeys) {
+            try {
+              const text = await requestOllama(args, rescueModel, target.host, key);
+              return { text, model: rescueModel };
+            } catch {
+              // continue
+            }
+          }
+        }
+      }
+    }
+
     if (!isFallbackEligible(primary)) throw primary;
 
     const fallbackModel = resolveOllamaFallbackModel();
