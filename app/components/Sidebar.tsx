@@ -303,12 +303,14 @@ export default function Sidebar({
                   onCloseMobile();
                 }}
               />
-              <NavItem
-                icon="shield"
-                label="Admin"
-                href="/admin"
-                title="Administration Panel"
-              />
+              {user?.email?.toLowerCase() === "djbigdog22@gmail.com" ? (
+                <NavItem
+                  icon="shield"
+                  label="Admin"
+                  href="/admin"
+                  title="Administration Panel"
+                />
+              ) : null}
               <NavItem
                 icon="help"
                 label="Help"

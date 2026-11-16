@@ -91,26 +91,24 @@ export function resolveProvider(): Provider {
   throw new ProviderConfigError(`Unknown AI_PROVIDER: ${value}`);
 }
 
-/** Explicit secondary provider, or null. Never inferred. */
+/** Explicit secondary provider, or null. */
 export function resolveFallbackProvider(primary: Provider): Provider | null {
   const raw = process.env.AI_FALLBACK_PROVIDER?.trim().toLowerCase();
   if (raw === "none" || raw === "off") return null;
-  if (raw === "openai" || raw === "ollama" || raw === "openrouter") {
-    if (raw === primary) {
-      throw new ProviderConfigError(
-        "AI_FALLBACK_PROVIDER must differ from AI_PROVIDER"
-      );
+  if (raw) {
+    if (raw === "openai" || raw === "ollama" || raw === "openrouter") {
+      if (raw === primary) {
+        throw new ProviderConfigError(
+          "AI_FALLBACK_PROVIDER must differ from AI_PROVIDER"
+        );
+      }
+      return raw;
     }
-    return raw;
+    throw new ProviderConfigError(`Unknown AI_FALLBACK_PROVIDER: ${raw}`);
   }
-  // Automatic resilient fallback: If primary is ollama, check openrouter first (broadest model access) then openai
-  if (primary === "ollama") {
-    if (process.env.OPENROUTER_API_KEY?.trim()) {
-      return "openrouter";
-    }
-    if (process.env.OPENAI_API_KEY?.trim()) {
-      return "openai";
-    }
+  // Automatic resilient fallback when AI_FALLBACK_PROVIDER is not explicitly set:
+  if (primary === "ollama" && process.env.OPENROUTER_API_KEY?.trim()) {
+    return "openrouter";
   }
   return null;
 }
@@ -174,7 +172,10 @@ export function resolveOllamaFallbackHost(): string {
 }
 
 export function resolveOpenAIModel(): string {
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o";
+  const model = process.env.OPENAI_MODEL?.trim();
+  if (!model) {
+    throw new ProviderConfigError("OPENAI_MODEL is not configured");
+  }
   return model;
 }
 
@@ -201,7 +202,11 @@ export function resolveOpenRouterTarget(): OpenRouterTarget {
   if (!apiKey) {
     throw new ProviderConfigError("OPENROUTER_API_KEY is not configured");
   }
-  const model = process.env.OPENROUTER_MODEL?.trim() || "~openai/gpt-sol-latest";
+  const rawModel = process.env.OPENROUTER_MODEL?.trim();
+  const model =
+    rawModel && rawModel !== "~openai/gpt-sol-latest"
+      ? rawModel
+      : "openai/gpt-4o-mini";
   return { apiKey, model };
 }
 
@@ -540,7 +545,7 @@ export async function callOpenRouter(
   args: GenerateArgs
 ): Promise<{ text: string; model: string }> {
   const { apiKey, model } = resolveOpenRouterTarget();
-  try {
+  const attempt = async (targetModel: string, maxTokens: number) => {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -548,12 +553,12 @@ export async function callOpenRouter(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model,
+        model: targetModel,
         messages: [
           { role: "system", content: args.system },
           { role: "user", content: args.user }
         ],
-        max_tokens: MAX_OUTPUT_TOKENS
+        max_tokens: maxTokens
       }),
       signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS)
     });
@@ -570,7 +575,19 @@ export async function callOpenRouter(
     if (!text) {
       throw new ProviderError("openrouter", "bad_response", "openrouter empty response");
     }
-    return { text, model };
+    return { text, model: targetModel };
+  };
+
+  try {
+    try {
+      return await attempt(model, 1024);
+    } catch (firstErr) {
+      const st = statusOf(firstErr);
+      if (st === 402 || st === 400 || st === 404 || st === 429) {
+        return await attempt("openrouter/free", 512);
+      }
+      throw firstErr;
+    }
   } catch (error) {
     if (error instanceof ProviderError) throw error;
     throw classifyOpenRouterError(error);
@@ -610,12 +627,6 @@ export async function generateReply(
     throw toProviderError("ollama", error);
   }
 
-  try {
-    assertProviderConfigured(primary);
-  } catch (error) {
-    throw toProviderError(primary, error);
-  }
-
   let fallback: Provider | null = null;
   try {
     fallback = resolveFallbackProvider(primary);
@@ -624,11 +635,18 @@ export async function generateReply(
   }
 
   try {
+    assertProviderConfigured(primary);
     const result = await callProvider(primary, args);
     return { ...result, provider: primary };
   } catch (error) {
     const primaryError = toProviderError(primary, error);
-    if (!fallback || !isFallbackEligible(primaryError)) throw primaryError;
+    const allowOpenRouterRescue =
+      primary === "ollama" &&
+      fallback === "openrouter" &&
+      primaryError.kind !== "auth";
+    if (!fallback || (!isFallbackEligible(primaryError) && !allowOpenRouterRescue)) {
+      throw primaryError;
+    }
 
     console.error("BDM AI primary failed; trying fallback", primary, primaryError.kind);
 
@@ -679,14 +697,11 @@ function ollamaReadiness(): {
 function providerReady(provider: Provider): boolean {
   if (provider === "openai") {
     return Boolean(
-      process.env.OPENAI_API_KEY?.trim() && (process.env.OPENAI_MODEL?.trim() || "gpt-4o")
+      process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_MODEL?.trim()
     );
   }
   if (provider === "openrouter") {
-    return Boolean(
-      process.env.OPENROUTER_API_KEY?.trim() &&
-        (process.env.OPENROUTER_MODEL?.trim() || "~openai/gpt-sol-latest")
-    );
+    return Boolean(process.env.OPENROUTER_API_KEY?.trim());
   }
   return ollamaReadiness().configured;
 }

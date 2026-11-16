@@ -228,6 +228,7 @@ export default function SettingsClient() {
   const googleConnected = Boolean(
     user && (google?.linked || providers.includes("google"))
   );
+  const isSuperadmin = user?.email?.toLowerCase() === "djbigdog22@gmail.com";
 
   const environment = useMemo(
     () => status?.environment ?? [],
@@ -410,14 +411,14 @@ export default function SettingsClient() {
             </div>
           </div>
 
-          {!google?.credentialsConfigured && (
+          {isSuperadmin && !google?.credentialsConfigured && (
             <p className="notice warn">
               Add <code>GOOGLE_CLIENT_ID</code> and{" "}
               <code>GOOGLE_CLIENT_SECRET</code> to the server environment, then
               restart the service.
             </p>
           )}
-          {!google?.identityStoreConfigured && (
+          {isSuperadmin && !google?.identityStoreConfigured && (
             <p className="notice warn">
               Add <code>SUPABASE_SERVICE_ROLE_KEY</code> and apply{" "}
               <code>supabase/migrations/0004_google_identities.sql</code>. Google
@@ -426,7 +427,7 @@ export default function SettingsClient() {
             </p>
           )}
 
-          {google?.callbackUrl ? (
+          {isSuperadmin && google?.callbackUrl ? (
             <div className="callback-box">
               <div>
                 <span className="field-label">
@@ -452,38 +453,32 @@ export default function SettingsClient() {
               </button>
             </div>
           ) : null}
-
-          <p className="hint">
-            In Google Cloud Console, create a Web application OAuth client and
-            add the redirect URI above. Then enable the Google provider in
-            Supabase Auth with the same client ID and secret: the session is
-            still issued by Supabase, so BDM does not run a second auth system.
-          </p>
         </section>
 
-        <section className="settings-section" aria-labelledby="github-heading">
-          <div className="section-head">
-            <div>
-              <h2 id="github-heading">GitHub</h2>
-              <p>OAuth sign-in with server-side identity guard.</p>
+        {isSuperadmin && (
+          <section className="settings-section" aria-labelledby="github-heading">
+            <div className="section-head">
+              <div>
+                <h2 id="github-heading">GitHub</h2>
+                <p>OAuth sign-in with server-side identity guard.</p>
+              </div>
+              <span className="status-pill ok">Configured</span>
             </div>
-            <span className="status-pill ok">Configured</span>
-          </div>
-          <div className="google-panel">
-            <p className="hint">Link logic uses <code>bdm_github_identities</code> (migration 0005). Add <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code>, and <code>SUPABASE_SERVICE_ROLE_KEY</code> to the server.</p>
-          </div>
-        </section>
+          </section>
+        )}
 
         <section className="settings-section" aria-labelledby="capabilities-heading">
           <div className="section-head">
             <div>
               <h2 id="capabilities-heading">Capabilities</h2>
-              <p>Provider readiness reported by the server. No secrets are shown.</p>
+              <p>Active workspace features for your session.</p>
             </div>
-            <Link className="btn ghost" href="/api/status" target="_blank">
-              <Icon name="external" size={15} />
-              Raw status
-            </Link>
+            {isSuperadmin && (
+              <Link className="btn ghost" href="/admin">
+                <Icon name="shield" size={15} />
+                Admin Command Deck
+              </Link>
+            )}
           </div>
 
           {loading ? (
@@ -597,160 +592,164 @@ export default function SettingsClient() {
           </div>
         </section>
 
-        <section className="settings-section" aria-labelledby="custom-models-heading">
-          <div className="section-head">
-            <div>
-              <h2 id="custom-models-heading">Custom API Models &amp; Providers</h2>
-              <p>
-                Add and switch between any OpenAI-compatible, OpenRouter, Ollama, or custom API model endpoint.
-              </p>
+        {isSuperadmin && (
+          <section className="settings-section" aria-labelledby="custom-models-heading">
+            <div className="section-head">
+              <div>
+                <h2 id="custom-models-heading">Custom API Models &amp; Providers</h2>
+                <p>
+                  Add and switch between any OpenAI-compatible, OpenRouter, Ollama, or custom API model endpoint.
+                </p>
+              </div>
+              <span className="status-pill ok">{savedModels.length} models ready</span>
             </div>
-            <span className="status-pill ok">{savedModels.length} models ready</span>
-          </div>
 
-          <form
-            className="google-panel"
-            style={{ display: "grid", gap: "10px", marginBottom: "12px" }}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!customModelId.trim()) return;
-              const entry = {
-                id: `model-${Date.now()}`,
-                provider: customProvider.trim() || "custom",
-                model: customModelId.trim(),
-                baseUrl: customBaseUrl.trim() || "https://api.openai.com/v1"
-              };
-              setSavedModels((prev) => [entry, ...prev]);
-              setCustomModelId("");
-              setCustomApiKey("");
-              setNotice(`Added API model ${entry.provider} · ${entry.model}`);
-            }}
-          >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <input
-                className="auth-input"
-                value={customProvider}
-                onChange={(e) => setCustomProvider(e.target.value)}
-                placeholder="Provider (openrouter, openai, ollama, custom)"
-                aria-label="API Provider"
-              />
-              <input
-                className="auth-input"
-                value={customModelId}
-                onChange={(e) => setCustomModelId(e.target.value)}
-                placeholder="Model ID (e.g. gpt-4.1, claude-sonnet-4.6)"
-                aria-label="Model ID"
-              />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "10px" }}>
-              <input
-                className="auth-input"
-                value={customBaseUrl}
-                onChange={(e) => setCustomBaseUrl(e.target.value)}
-                placeholder="Endpoint Base URL (https://...)"
-                aria-label="Endpoint Base URL"
-              />
-              <input
-                className="auth-input"
-                type="password"
-                value={customApiKey}
-                onChange={(e) => setCustomApiKey(e.target.value)}
-                placeholder="API Key (stored privately, never exposed)"
-                aria-label="Custom API Key"
-              />
-              <button type="submit" className="btn primary">
-                Add API Model
-              </button>
-            </div>
-          </form>
+            <form
+              className="google-panel"
+              style={{ display: "grid", gap: "10px", marginBottom: "12px" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!customModelId.trim()) return;
+                const entry = {
+                  id: `model-${Date.now()}`,
+                  provider: customProvider.trim() || "custom",
+                  model: customModelId.trim(),
+                  baseUrl: customBaseUrl.trim() || "https://api.openai.com/v1"
+                };
+                setSavedModels((prev) => [entry, ...prev]);
+                setCustomModelId("");
+                setCustomApiKey("");
+                setNotice(`Added API model ${entry.provider} · ${entry.model}`);
+              }}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <input
+                  className="auth-input"
+                  value={customProvider}
+                  onChange={(e) => setCustomProvider(e.target.value)}
+                  placeholder="Provider (openrouter, openai, ollama, custom)"
+                  aria-label="API Provider"
+                />
+                <input
+                  className="auth-input"
+                  value={customModelId}
+                  onChange={(e) => setCustomModelId(e.target.value)}
+                  placeholder="Model ID (e.g. gpt-4.1, claude-sonnet-4.6)"
+                  aria-label="Model ID"
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "10px" }}>
+                <input
+                  className="auth-input"
+                  value={customBaseUrl}
+                  onChange={(e) => setCustomBaseUrl(e.target.value)}
+                  placeholder="Endpoint Base URL (https://...)"
+                  aria-label="Endpoint Base URL"
+                />
+                <input
+                  className="auth-input"
+                  type="password"
+                  value={customApiKey}
+                  onChange={(e) => setCustomApiKey(e.target.value)}
+                  placeholder="API Key (stored privately, never exposed)"
+                  aria-label="Custom API Key"
+                />
+                <button type="submit" className="btn primary">
+                  Add API Model
+                </button>
+              </div>
+            </form>
 
-          <ul className="settings-list">
-            {savedModels.map((m) => (
-              <li className="settings-row" key={m.id}>
-                <span className="settings-label">
-                  {m.provider.toUpperCase()} · {m.model}
-                </span>
-                <span className="settings-value">
-                  <code>{m.baseUrl}</code>
-                </span>
-                <span className="chip ok">Configured</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="settings-section" aria-labelledby="environment-heading">
-          <div className="section-head">
-            <div>
-              <h2 id="environment-heading">Private Environment Configuration</h2>
-              <p>
-                Protected by BDM Security Shield. Configuration details are hidden by default to prevent exposure.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setShowPrivateEnv((v) => !v)}
-              >
-                <Icon name="lock" size={14} />
-                {showPrivateEnv ? "Hide Configuration" : "Unlock Private View"}
-              </button>
-              {missingRequired.length > 0 ? (
-                <span className="status-pill warn">
-                  {missingRequired.length} required missing
-                </span>
-              ) : (
-                <span className="status-pill ok">Protected &amp; Ready</span>
-              )}
-            </div>
-          </div>
-
-          {!showPrivateEnv ? (
-            <p className="notice ok">
-              Configuration variables are locked and hidden behind the BDM Privacy Shield. Click{" "}
-              <strong>Unlock Private View</strong> above only when inspecting deployment readiness.
-            </p>
-          ) : loading ? (
-            <div className="skeleton-block" />
-          ) : groupedEnvironment.length === 0 ? (
-            <p className="notice warn">
-              Sign in as the workspace owner to inspect server environment diagnostics.
-            </p>
-          ) : (
-            <div className="settings-list">
-              {groupedEnvironment.map((group) => (
-                <div key={group.group}>
-                  <div className="sidebar-label" style={{ margin: "10px 0 6px" }}>
-                    {group.group}
-                  </div>
-                  <ul className="settings-list">
-                    {group.items.map((item) => (
-                      <li className="settings-row" key={item.name}>
-                        <span className="settings-label">{item.name}</span>
-                        <span className="settings-value">
-                          <code>{item.purpose}</code>
-                        </span>
-                        <span className={`chip ${item.present ? "ok" : "muted"}`}>
-                          {item.present ? "Present" : "Not set"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            <ul className="settings-list">
+              {savedModels.map((m) => (
+                <li className="settings-row" key={m.id}>
+                  <span className="settings-label">
+                    {m.provider.toUpperCase()} · {m.model}
+                  </span>
+                  <span className="settings-value">
+                    <code>{m.baseUrl}</code>
+                  </span>
+                  <span className="chip ok">Configured</span>
+                </li>
               ))}
-            </div>
-          )}
+            </ul>
+          </section>
+        )}
 
-          {missingOptional.length > 0 ? (
-            <p className="hint">
-              {missingOptional.length} optional variable
-              {missingOptional.length === 1 ? " is" : "s are"} not set. The
-              matching feature stays switched off rather than failing at
-              request time.
-            </p>
-          ) : null}
-        </section>
+        {isSuperadmin && (
+          <section className="settings-section" aria-labelledby="environment-heading">
+            <div className="section-head">
+              <div>
+                <h2 id="environment-heading">Private Environment Configuration</h2>
+                <p>
+                  Protected by BDM Security Shield. Configuration details are hidden by default to prevent exposure.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => setShowPrivateEnv((v) => !v)}
+                >
+                  <Icon name="lock" size={14} />
+                  {showPrivateEnv ? "Hide Configuration" : "Unlock Private View"}
+                </button>
+                {missingRequired.length > 0 ? (
+                  <span className="status-pill warn">
+                    {missingRequired.length} required missing
+                  </span>
+                ) : (
+                  <span className="status-pill ok">Protected &amp; Ready</span>
+                )}
+              </div>
+            </div>
+
+            {!showPrivateEnv ? (
+              <p className="notice ok">
+                Configuration variables are locked and hidden behind the BDM Privacy Shield. Click{" "}
+                <strong>Unlock Private View</strong> above only when inspecting deployment readiness.
+              </p>
+            ) : loading ? (
+              <div className="skeleton-block" />
+            ) : groupedEnvironment.length === 0 ? (
+              <p className="notice warn">
+                Sign in as the workspace owner to inspect server environment diagnostics.
+              </p>
+            ) : (
+              <div className="settings-list">
+                {groupedEnvironment.map((group) => (
+                  <div key={group.group}>
+                    <div className="sidebar-label" style={{ margin: "10px 0 6px" }}>
+                      {group.group}
+                    </div>
+                    <ul className="settings-list">
+                      {group.items.map((item) => (
+                        <li className="settings-row" key={item.name}>
+                          <span className="settings-label">{item.name}</span>
+                          <span className="settings-value">
+                            <code>{item.purpose}</code>
+                          </span>
+                          <span className={`chip ${item.present ? "ok" : "muted"}`}>
+                            {item.present ? "Present" : "Not set"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {missingOptional.length > 0 ? (
+              <p className="hint">
+                {missingOptional.length} optional variable
+                {missingOptional.length === 1 ? " is" : "s are"} not set. The
+                matching feature stays switched off rather than failing at
+                request time.
+              </p>
+            ) : null}
+          </section>
+        )}
 
         <section className="settings-section" aria-labelledby="privacy-heading">
           <div className="section-head">

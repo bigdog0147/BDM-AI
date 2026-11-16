@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminAccess } from "../../../lib/admin-guard";
 import { aiStatus } from "../../../lib/ai";
 import { currentUser } from "../../../lib/auth";
 import { environmentStatus } from "../../../lib/diagnostics";
@@ -23,9 +24,14 @@ export const dynamic = "force-dynamic";
  *
  * Every field is a boolean, a provider name, a model name, or a limit.
  * No key, token, URL with credentials, or secret value is ever included.
+ * Internal environment diagnostics and OAuth redirect origins are strictly
+ * gated behind verified superadmin authorization.
  */
 export async function GET(request: Request): Promise<Response> {
   const user = await currentUser();
+  const adminVerdict = await getAdminAccess(request);
+  const isSuperadmin = adminVerdict.ok;
+
   const voice = transcriptionStatus();
   const email = emailStatus();
   const googleConfig = getGoogleConfig(requestOrigin(request));
@@ -33,11 +39,9 @@ export async function GET(request: Request): Promise<Response> {
   const googleLink =
     user && googleStore ? await findGoogleLinkForUser(user.id) : null;
 
-  const isOwnerOrDev =
-    Boolean(user) || process.env.NODE_ENV !== "production";
-
   return NextResponse.json({
     signedIn: Boolean(user),
+    isSuperadmin,
     firewall: {
       active: true,
       mode: "enforcing",
@@ -76,14 +80,14 @@ export async function GET(request: Request): Promise<Response> {
       configured: googleConfig.ok && googleStore,
       credentialsConfigured: googleConfig.ok,
       identityStoreConfigured: googleStore,
-      callbackUrl: isOwnerOrDev ? googleCallbackUrl(requestOrigin(request)) : "",
+      callbackUrl: isSuperadmin ? googleCallbackUrl(requestOrigin(request)) : "",
       // The origin to register as an authorized JavaScript origin.
-      origin: isOwnerOrDev ? requestOrigin(request) : "",
+      origin: isSuperadmin ? requestOrigin(request) : "",
       linked: Boolean(user && googleLink?.ok && googleLink.value),
       providers: user?.providers ?? []
     },
     quotas: quotaStatus(),
-    // Variable NAMES and presence only, gated behind owner sign-in in production.
-    environment: isOwnerOrDev ? environmentStatus() : []
+    // Variable NAMES and presence only, strictly gated behind superadmin sign-in.
+    environment: isSuperadmin ? environmentStatus() : []
   });
 }
