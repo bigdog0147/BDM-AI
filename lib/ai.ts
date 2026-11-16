@@ -419,37 +419,6 @@ export async function callOllama(
       error instanceof ProviderError
         ? error
         : new ProviderError("ollama", "bad_response", "ollama failed");
-
-    // In cloud mode, rotate through any backup Ollama API keys (OLLAMA_API_KEY2, OLLAMA_API_KEY_)
-    // and try fast cloud fallback models if on Render.
-    if (target.mode === "cloud") {
-      const altKeys = resolveAllOllamaApiKeys().filter((k) => k !== target.apiKey);
-      for (const altKey of altKeys) {
-        try {
-          const text = await requestOllama(args, target.model, target.host, altKey);
-          return { text, model: target.model };
-        } catch {
-          // continue
-        }
-      }
-      if (isRender() && primary.kind !== "auth") {
-        const cloudRescueModels = ["deepseek-v4.1-flash", "glm-5.3-flash"].filter(
-          (m) => m !== target.model
-        );
-        const allKeys = resolveAllOllamaApiKeys();
-        for (const rescueModel of cloudRescueModels) {
-          for (const key of allKeys) {
-            try {
-              const text = await requestOllama(args, rescueModel, target.host, key);
-              return { text, model: rescueModel };
-            } catch {
-              // continue
-            }
-          }
-        }
-      }
-    }
-
     if (!isFallbackEligible(primary)) throw primary;
 
     const fallbackModel = resolveOllamaFallbackModel();
@@ -679,6 +648,17 @@ export async function generateReply(
     fallback = resolveFallbackProvider(primary);
   } catch (error) {
     throw toProviderError(primary, error);
+  }
+
+  // Fast-path on Render when OPENROUTER_API_KEY is available and primary is ollama
+  // so chat responds in ~1-2 seconds instead of waiting for upstream Ollama Cloud timeouts.
+  if (isRender() && primary === "ollama" && Boolean(process.env.OPENROUTER_API_KEY?.trim())) {
+    try {
+      const fastResult = await callOpenRouter(args);
+      return { ...fastResult, provider: "openrouter" };
+    } catch {
+      // Fall through to normal primary/fallback sequence if OpenRouter fails
+    }
   }
 
   try {

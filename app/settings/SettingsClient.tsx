@@ -39,15 +39,6 @@ const GOOGLE_ERRORS: Record<string, string> = {
     "The Google redirect URI is invalid. Use HTTPS, or localhost during development."
 };
 
-const GROUP_ORDER = [
-  "AI",
-  "Research",
-  "Voice",
-  "Images",
-  "Auth",
-  "Google",
-  "Email"
-] as const;
 
 function Capability({
   icon,
@@ -89,27 +80,6 @@ export default function SettingsClient() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [showPrivateEnv, setShowPrivateEnv] = useState(false);
-  const [customProvider, setCustomProvider] = useState("openrouter");
-  const [customModelId, setCustomModelId] = useState("google/gemini-2.5-pro");
-  const [customBaseUrl, setCustomBaseUrl] = useState("https://openrouter.ai/api/v1");
-  const [customApiKey, setCustomApiKey] = useState("");
-  const [savedModels, setSavedModels] = useState<
-    { id: string; provider: string; model: string; baseUrl: string }[]
-  >([
-    {
-      id: "preset-1",
-      provider: "ollama",
-      model: "gemma4:31b",
-      baseUrl: "https://ollama.com"
-    },
-    {
-      id: "preset-2",
-      provider: "openrouter",
-      model: "anthropic/claude-sonnet-4.6",
-      baseUrl: "https://openrouter.ai/api/v1"
-    }
-  ]);
   const [importStatus, setImportStatus] = useState<{
     ok: boolean;
     message: string;
@@ -230,30 +200,6 @@ export default function SettingsClient() {
   );
   const isSuperadmin = user?.email?.toLowerCase() === "djbigdog22@gmail.com";
 
-  const environment = useMemo(
-    () => status?.environment ?? [],
-    [status?.environment]
-  );
-  const groupedEnvironment = useMemo(() => {
-    const groups = new Map<string, typeof environment>();
-    for (const item of environment) {
-      const list = groups.get(item.group) ?? [];
-      list.push(item);
-      groups.set(item.group, list);
-    }
-    return GROUP_ORDER.filter((group) => groups.has(group)).map((group) => ({
-      group,
-      items: groups.get(group) ?? []
-    }));
-  }, [environment]);
-
-  const missingRequired = environment.filter(
-    (item) => item.kind === "required" && !item.present
-  );
-  const missingOptional = environment.filter(
-    (item) => item.kind !== "required" && !item.present
-  );
-
   return (
     <main className="settings-page">
       <header className="settings-topbar">
@@ -292,7 +238,7 @@ export default function SettingsClient() {
           <div className="section-head">
             <div>
               <h2 id="account-heading">Account</h2>
-              <p>The existing Supabase account and secure cookie session.</p>
+              <p>Account identity and authentication security.</p>
             </div>
             {user && (
               <button type="button" className="btn ghost" onClick={signOut}>
@@ -311,17 +257,11 @@ export default function SettingsClient() {
               </span>
               <div className="account-details">
                 <strong>{user.email ?? "Signed in"}</strong>
-                <span>User ID · {user.id.slice(0, 8)}…</span>
                 <div className="provider-row">
-                  {providers.length > 0 ? (
-                    providers.map((provider) => (
-                      <span className="pill" key={provider}>
-                        {provider === "email" ? "Password" : provider}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="pill">Supabase session</span>
-                  )}
+                  <span className="chip ok">
+                    <Icon name="shield" size={12} />
+                    Active &amp; Protected
+                  </span>
                 </div>
               </div>
             </div>
@@ -471,7 +411,7 @@ export default function SettingsClient() {
           <div className="section-head">
             <div>
               <h2 id="capabilities-heading">Capabilities</h2>
-              <p>Active workspace features for your session.</p>
+              <p>Active workspace intelligence and integration status.</p>
             </div>
             {isSuperadmin && (
               <Link className="btn ghost" href="/admin">
@@ -592,165 +532,6 @@ export default function SettingsClient() {
           </div>
         </section>
 
-        {isSuperadmin && (
-          <section className="settings-section" aria-labelledby="custom-models-heading">
-            <div className="section-head">
-              <div>
-                <h2 id="custom-models-heading">Custom API Models &amp; Providers</h2>
-                <p>
-                  Add and switch between any OpenAI-compatible, OpenRouter, Ollama, or custom API model endpoint.
-                </p>
-              </div>
-              <span className="status-pill ok">{savedModels.length} models ready</span>
-            </div>
-
-            <form
-              className="google-panel"
-              style={{ display: "grid", gap: "10px", marginBottom: "12px" }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!customModelId.trim()) return;
-                const entry = {
-                  id: `model-${Date.now()}`,
-                  provider: customProvider.trim() || "custom",
-                  model: customModelId.trim(),
-                  baseUrl: customBaseUrl.trim() || "https://api.openai.com/v1"
-                };
-                setSavedModels((prev) => [entry, ...prev]);
-                setCustomModelId("");
-                setCustomApiKey("");
-                setNotice(`Added API model ${entry.provider} · ${entry.model}`);
-              }}
-            >
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <input
-                  className="auth-input"
-                  value={customProvider}
-                  onChange={(e) => setCustomProvider(e.target.value)}
-                  placeholder="Provider (openrouter, openai, ollama, custom)"
-                  aria-label="API Provider"
-                />
-                <input
-                  className="auth-input"
-                  value={customModelId}
-                  onChange={(e) => setCustomModelId(e.target.value)}
-                  placeholder="Model ID (e.g. gpt-4.1, claude-sonnet-4.6)"
-                  aria-label="Model ID"
-                />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "10px" }}>
-                <input
-                  className="auth-input"
-                  value={customBaseUrl}
-                  onChange={(e) => setCustomBaseUrl(e.target.value)}
-                  placeholder="Endpoint Base URL (https://...)"
-                  aria-label="Endpoint Base URL"
-                />
-                <input
-                  className="auth-input"
-                  type="password"
-                  value={customApiKey}
-                  onChange={(e) => setCustomApiKey(e.target.value)}
-                  placeholder="API Key (stored privately, never exposed)"
-                  aria-label="Custom API Key"
-                />
-                <button type="submit" className="btn primary">
-                  Add API Model
-                </button>
-              </div>
-            </form>
-
-            <ul className="settings-list">
-              {savedModels.map((m) => (
-                <li className="settings-row" key={m.id}>
-                  <span className="settings-label">
-                    {m.provider.toUpperCase()} · {m.model}
-                  </span>
-                  <span className="settings-value">
-                    <code>{m.baseUrl}</code>
-                  </span>
-                  <span className="chip ok">Configured</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {isSuperadmin && (
-          <section className="settings-section" aria-labelledby="environment-heading">
-            <div className="section-head">
-              <div>
-                <h2 id="environment-heading">Private Environment Configuration</h2>
-                <p>
-                  Protected by BDM Security Shield. Configuration details are hidden by default to prevent exposure.
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => setShowPrivateEnv((v) => !v)}
-                >
-                  <Icon name="lock" size={14} />
-                  {showPrivateEnv ? "Hide Configuration" : "Unlock Private View"}
-                </button>
-                {missingRequired.length > 0 ? (
-                  <span className="status-pill warn">
-                    {missingRequired.length} required missing
-                  </span>
-                ) : (
-                  <span className="status-pill ok">Protected &amp; Ready</span>
-                )}
-              </div>
-            </div>
-
-            {!showPrivateEnv ? (
-              <p className="notice ok">
-                Configuration variables are locked and hidden behind the BDM Privacy Shield. Click{" "}
-                <strong>Unlock Private View</strong> above only when inspecting deployment readiness.
-              </p>
-            ) : loading ? (
-              <div className="skeleton-block" />
-            ) : groupedEnvironment.length === 0 ? (
-              <p className="notice warn">
-                Sign in as the workspace owner to inspect server environment diagnostics.
-              </p>
-            ) : (
-              <div className="settings-list">
-                {groupedEnvironment.map((group) => (
-                  <div key={group.group}>
-                    <div className="sidebar-label" style={{ margin: "10px 0 6px" }}>
-                      {group.group}
-                    </div>
-                    <ul className="settings-list">
-                      {group.items.map((item) => (
-                        <li className="settings-row" key={item.name}>
-                          <span className="settings-label">{item.name}</span>
-                          <span className="settings-value">
-                            <code>{item.purpose}</code>
-                          </span>
-                          <span className={`chip ${item.present ? "ok" : "muted"}`}>
-                            {item.present ? "Present" : "Not set"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {missingOptional.length > 0 ? (
-              <p className="hint">
-                {missingOptional.length} optional variable
-                {missingOptional.length === 1 ? " is" : "s are"} not set. The
-                matching feature stays switched off rather than failing at
-                request time.
-              </p>
-            ) : null}
-          </section>
-        )}
-
         <section className="settings-section" aria-labelledby="privacy-heading">
           <div className="section-head">
             <div>
@@ -783,10 +564,10 @@ export default function SettingsClient() {
             </div>
             <div>
               <Icon name="lock" size={17} />
-              <strong>Session</strong>
+              <strong>Encrypted Traffic</strong>
               <p>
-                Supabase auth cookies stay httpOnly and are refreshed by the
-                server proxy.
+                All workspace interactions, active sessions, and credentials stay
+                protected by strict TLS encryption.
               </p>
             </div>
           </div>
